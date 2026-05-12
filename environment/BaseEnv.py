@@ -61,3 +61,7 @@ class BaseEnv(mjx_env.MjxEnv):
     @property
     def mjx_model(self) -> mjx.Model:
         return self.mjx_model
+    
+def main():
+    env = BaseEnv()
+    state = env.reset(rng = jax.random.PRNGKey(0))
