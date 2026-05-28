@@ -10,7 +10,7 @@ import mujoco
 
 
 
-class GenerateModel():
+class GenModel():
     def __init__(
         self,
         model_config_path: Any,
@@ -197,13 +197,7 @@ class GenerateModel():
                     armature = torso_children_params[child]['armature'],
                     damping = torso_children_params[child]['damping'],
                 )
-                body.add_site(
-                    name=f'{body_name}_site',
-                    pos=[0, 0, 0],
-                    type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                    rgba=[1, 0, 0, 1],
-                    size=[0.05, 0.05, 0.05],
-                )
+
                 if(child == 'front_wheel' or child == 'rear_wheel'):
                     body.add_geom(
                         name=geom_name,
@@ -336,13 +330,7 @@ class GenerateModel():
                     armature = head_children_params[child]['armature'],
                     damping = head_children_params[child]['damping'],
                 )                
-                body.add_site(
-                    name=f'{body_name}_site',
-                    pos=[0, 0, 0],
-                    type=mujoco.mjtGeom.mjGEOM_SPHERE,
-                    rgba=[1, 0, 0, 1],
-                    size=[0.05, 0.05, 0.05],
-                )
+
                 if(child == 'front_wheel' or child == 'rear_wheel'):
                     body.add_geom(
                         name=geom_name,
@@ -380,12 +368,12 @@ class GenerateModel():
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='bl_wheel1_joint',
+            name='bl_wheel1',
             target='torso_left_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='bl_wheel2_joint',
+            name='bl_wheel2',
             target='torso_left_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
@@ -402,12 +390,12 @@ class GenerateModel():
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='br_wheel1_joint',
+            name='br_wheel1',
             target='torso_right_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='br_wheel2_joint',
+            name='br_wheel2',
             target='torso_right_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
@@ -424,12 +412,12 @@ class GenerateModel():
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='fl_wheel1_joint',
+            name='fl_wheel1',
             target='head_left_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='fl_wheel2_joint',
+            name='fl_wheel2',
             target='head_left_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
@@ -446,12 +434,12 @@ class GenerateModel():
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='fr_wheel1_joint',
+            name='fr_wheel1',
             target='head_right_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
         spec.add_actuator(
-            name='fr_wheel2_joint',
+            name='fr_wheel2',
             target='head_right_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
@@ -462,7 +450,19 @@ class GenerateModel():
 
 
 
-    def gen_scene(self):
+    def add_scene(self):
+        # Create skybox so background isn't just black
+        self.spec.add_texture(type = mujoco.mjtTexture.mjTEXTURE_SKYBOX,
+                              builtin = mujoco.mjtBuiltin.mjBUILTIN_GRADIENT,
+                                width = 300,
+                                height = 300,
+                                name="skybox",
+                                rgb2 = [0.4, 0.7, 0.9],)
+        # Ground plane texture/material
+        self.spec.add_material(name="groundplane_material",
+                        texrepeat=[2, 2],
+                        reflectance=0., 
+                        ).textures[mujoco.mjtTextureRole.mjTEXROLE_RGB] = 'ground_texture'
         # Create ground plane texture/material
         ground = self.spec.add_texture(type = mujoco.mjtTexture.mjTEXTURE_2D,
                               name="ground_texture",
@@ -472,36 +472,22 @@ class GenerateModel():
                               rgb1=[0.5, 0.8, 0.9], 
                               rgb2=[0.5, 0.9, 0.8],
                               markrgb=[0.8, 0.8, 0.8])
-        
-        self.spec.add_material(name="groundplane",
-                              texrepeat=[2, 2],
-                              reflectance=0., 
-                              ).textures[mujoco.mjtTextureRole.mjTEXROLE_RGB] = 'ground_texture'
-        
+        # Add an array of lights to the scene:
+        for i in range(15):
+            for j in range(15):
+                self.spec.worldbody.add_light(
+                    pos=[3*i, 3*j, 50],
+                    dir=[0, 0, -1],
+                    diffuse=[0.1, 0.1, 0.1],
+                    specular=[0.1, 0.1, 0.1],
+                    intensity=1.0,
+                )
+    def add_groundplane(self):
         self.spec.worldbody.add_geom(
             type=mujoco.mjtGeom.mjGEOM_PLANE,
             size=[0, 0, 0.05],
-            material="groundplane",
+            material="groundplane_material",
         )
-
-
-        # Create skybox so background isn't just black
-        self.spec.add_texture(type = mujoco.mjtTexture.mjTEXTURE_SKYBOX,
-                              builtin = mujoco.mjtBuiltin.mjBUILTIN_GRADIENT,
-                                width = 300,
-                                height = 300,
-                                name="skybox")
-
-        # Add an array of lights to the scene:
-        for i in range(5):
-            for j in range(5):
-                self.spec.worldbody.add_light(
-                    pos=[2*i, 2*j, 15],
-                    dir=[0, 0, -1],
-                    diffuse=[0.1, 0.1, 0.1],
-                    specular=[0., 0., 0.],
-                )
-        
 
 
     def add_box(self, pos:list, size:list, **kwargs):
@@ -519,57 +505,6 @@ class GenerateModel():
             type=mujoco.mjtGeom.mjGEOM_BOX,
             size=size,
             )
-
-    def randomize_test_scene(self,rng):
-        # Min/Max random values:
-        xi_max = 1.25
-        yi_max = 1.25
-        ledge_height_min = 0.25
-        ledge_height_max = 0.8
-        min_heading = -np.pi/2
-        max_heading = np.pi/2
-        max_knee_vel = 0.05
-        max_wheel_vel = 0.1
-        
-        # Random initial position and heading: 
-        xi = rng.uniform(-1,1)*xi_max
-        yi = rng.uniform(-1,1)*yi_max
-        heading_i = rng.uniform(min_heading, max_heading)
-
-
-        # Random ledge height:
-        ledge_height = rng.uniform(ledge_height_min,ledge_height_max)
-        self.add_box([0,0, ledge_height/2], [xi_max*1.5, yi_max*1.5, ledge_height/2])
-        self.spec.bodies[1].pos = [xi, yi, ledge_height+0.4]        
-        self.spec.bodies[1].quat = [np.cos(heading_i/2), 0, 0, np.sin(heading_i/2)]
-        # Random initial joint positions:
-        
-    def randomize_pose(self,rng,m,d):
-        # Min/max joint positions to randomize:
-        hip_min = np.pi/6
-        hip_max = np.pi/2
-        knee_min = -np.pi/2
-        knee_max = np.pi/2
-
-        # Hip positions:
-        rand_hip_splay = rng.uniform(hip_min, hip_max)
-        d.jnt('head_left_thigh_joint').qpos[0] = -rand_hip_splay
-        d.jnt('head_right_thigh_joint').qpos[0] = -rand_hip_splay
-        d.jnt('torso_left_thigh_joint').qpos[0] = rand_hip_splay
-        d.jnt('torso_right_thigh_joint').qpos[0] = rand_hip_splay
-
-        # Knee positions: 
-        rand_left_knees = rng.uniform(knee_min, knee_max)
-        rand_right_knees = rng.uniform(knee_min, knee_max)
-        d.jnt('head_left_thigh_shin_joint').qpos[0] = rng.uniform(knee_min, knee_max)
-        d.jnt('torso_left_thigh_shin_joint').qpos[0] = rng.uniform(knee_min, knee_max)
-        d.jnt('head_right_thigh_shin_joint').qpos[0] = rng.uniform(knee_min, knee_max)
-        d.jnt('torso_right_thigh_shin_joint').qpos[0] = rng.uniform(knee_min, knee_max)
-
-
-
-        return d
-
 
             
     def add_payload(self, mass: float = 32.0, body_loc: list = [0,0,0.2], size = [0.1, 0.1, 0.1]):
@@ -615,7 +550,7 @@ def main(argv=None):
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir,)))
     model_config_path = 'modeling/model_configs/2_7_Scale/model_config.yaml'
     motor_config_path = 'modeling/model_configs/2_7_Scale/motor_config.yaml'
-    model_class = GenerateModel(model_config_path, motor_config_path)
+    model_class = GenModel(model_config_path, motor_config_path)
 
     xml_path = os.path.join(
         os.path.dirname(__file__),
@@ -624,6 +559,9 @@ def main(argv=None):
 
     with open(xml_path, "w") as f:
         f.writelines(model_class.model_xml)
+
+    # Open mujoco viewer
+    mujoco.viewer.launch(model_class.model_xml)
 
 
 if __name__ == '__main__':
