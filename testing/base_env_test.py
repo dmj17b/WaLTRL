@@ -3,12 +3,15 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import mujoco
 import mujoco.viewer
-from mujoco import mjx
 import time
 import jax.numpy as jp
+import jax
+from environment.BaseEnv import BaseEnv
+
 
 def main():
-    pass
+    env = BaseEnv()
+    state = env.reset(rng=jax.random.PRNGKey(0))
 
 if __name__ == "__main__":
     main()

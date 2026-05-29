@@ -17,8 +17,8 @@ model_spec = GenModel.GenModel(model_config, motor_config)  # Create an instance
 model_spec.add_scene()  # Add the scene to the model
 model_spec.add_groundplane()  # Add a ground plane to the model
 
-mj_model = model_spec.spec.compile()
-mj_data = mujoco.MjData(mj_model)
+m = model_spec.spec.compile()
+d = mujoco.MjData(m)
 
 js = joystick.Joystick(0)  # Initialize the first joystick
 js.init()
@@ -30,7 +30,7 @@ def deadzone(value, threshold=0.1):
     return value
 
 # Launch standard MuJoCo viewer
-with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
+with mujoco.viewer.launch_passive(m, d) as viewer:
     while viewer.is_running():
         # Keep track of step time
         start_time = time.time()
@@ -38,16 +38,16 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         viewer.sync()  # Sync the viewer to update the visualization
 
 
-        mujoco.mj_step(mj_model, mj_data)  # Step the simulation forward
+        mujoco.mj_step(m, d)  # Step the simulation forward
 
         # Change qpos based on joystick states
         pygame.event.pump()  # Process event queue to update joystick state
 
-        mj_data.qpos[0] += 0.01*deadzone(js.get_axis(0))  # Use the horizontal axis of the joystick to control x position
-        mj_data.qpos[1] -= 0.01*deadzone(js.get_axis(3))  # Use the vertical axis of the joystick to control z position
+        d.qpos[0] += 0.01*deadzone(js.get_axis(0))  # Use the horizontal axis of the joystick to control x position
+        d.qpos[1] -= 0.01*deadzone(js.get_axis(3))  # Use the vertical axis of the joystick to control z position
 
 
         # Rudimentary time keeping, will drift relative to wall clock.
-        time_until_next_step = (mj_model.opt.timestep - (time.time() - start_time))
+        time_until_next_step = (m.opt.timestep - (time.time() - start_time))
         if time_until_next_step > 0:
             time.sleep(time_until_next_step)
