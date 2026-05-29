@@ -126,6 +126,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
 
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
+        '''Apply the given action to the environment and step the simulation forward.'''
         pass
 
 
@@ -160,6 +161,7 @@ class BaseEnv(mjx_env.MjxEnv):
         pass
 
     def sample_command(self, rng: jax.Array) -> jax.Array:
+
         # Split RNG keys
         rng, lin_vel_rng, ang_vel_rng, zero_rng = jax.random.split(rng, num=4)
         # Determine whether to sample a zero command based on the specified probability
@@ -173,6 +175,35 @@ class BaseEnv(mjx_env.MjxEnv):
         ang_vel_command = jp.where(is_zero_command, 0.0, ang_vel_command)
         command = jp.array([lin_vel_command, ang_vel_command])
         return command
+    
+    def _maybe_update_cmd(self, info: dict[str, Any]) -> dict[str, Any]:
+        """Checks if it's time to update the command and samples a new one if necessary."""
+        new_info = dict(info)
+        new_info["steps_since_cmd_change"] = info["steps_since_cmd_change"] + 1  # Increment the steps since last command change
+        command_key, time_key, rng = jax.random.split(info["rng"], num=3)  # Split the RNG for command sampling and time sampling
+
+        # Check if it's time to sample a new command:
+        new_cmd = jp.where(
+            new_info["steps_since_cmd_change"] >= new_info["steps_until_cmd_change"],
+            self.sample_command(command_key),  # Sample a new command if the counter has reached the threshold
+            info["command"]  # Otherwise, keep the current command
+        )
+        steps_since_cmd_change = jp.where(
+            new_info["steps_since_cmd_change"] >= new_info["steps_until_cmd_change"],
+            0,  # Reset the counter if a new command is sampled
+            new_info["steps_since_cmd_change"]  # Otherwise, keep the current counter
+        )
+        steps_until_cmd_change = jp.where(
+            new_info["steps_since_cmd_change"] >= new_info["steps_until_cmd_change"],
+            jax.random.randint(time_key, (), self.min_steps_per_command, self.max_steps_per_command + 1),  # Sample a new duration for the next command if the counter has reached the threshold
+            new_info["steps_until_cmd_change"]  # Otherwise, keep the current duration
+        )
+        new_info["steps_until_cmd_change"] = steps_until_cmd_change  # Update the steps until command change in the info dictionary
+        new_info["command"] = new_cmd  # Update the command in the info dictionary
+        new_info["steps_since_cmd_change"] = steps_since_cmd_change  # Update the counter in the info dictionary
+        new_info["rng"] = rng  # Update the RNG in the info dictionary for the next step
+
+        return new_info
     
 
     def _define_addresses(self):
