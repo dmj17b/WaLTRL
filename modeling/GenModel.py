@@ -134,7 +134,6 @@ class GenModel():
                 'geom_pos': np.array([0, thigh_width / 2, -thigh_length / 2]),
                 'geom_quat': np.array([1, 0, 0, 0]),
                 'mass': thigh_mass,
-                'armature': hip_armature,
                 'damping': hip_damping,
             },
             'shin': {
@@ -145,7 +144,6 @@ class GenModel():
                 'geom_pos': np.array([0, 0, 0]),
                 'geom_quat': np.array([1, 0, 1, 0]),
                 'mass': shin_mass,
-                'armature': knee_armature,
                 'damping': knee_damping,
             },
             'front_wheel': {
@@ -156,7 +154,6 @@ class GenModel():
                 'geom_pos': np.array([0, 0, 0]),
                 'geom_quat': np.array([1, 1, 0, 0]),
                 'mass': wheel_mass,
-                'armature': wheel_armature,
                 'damping': wheel_damping,
             },
             'rear_wheel': {
@@ -167,7 +164,6 @@ class GenModel():
                 'geom_pos': np.array([0, 0, 0]),
                 'geom_quat': np.array([1, 1, 0, 0]),
                 'mass': wheel_mass,
-                'armature': wheel_armature,
                 'damping': wheel_damping,
             },
         }
@@ -194,7 +190,6 @@ class GenModel():
                     type=mujoco.mjtJoint.mjJNT_HINGE,
                     name=joint_name,
                     axis=[0, 1, 0],
-                    armature = torso_children_params[child]['armature'],
                     damping = torso_children_params[child]['damping'],
                 )
 
@@ -267,7 +262,6 @@ class GenModel():
                 'geom_pos': np.array([0, thigh_width / 2, -thigh_length / 2]),
                 'geom_quat': np.array([1, 0, 0, 0]),
                 'mass': thigh_mass,
-                'armature': hip_armature,
                 'damping': hip_damping,
             },
             'shin': {
@@ -278,7 +272,6 @@ class GenModel():
                 'geom_pos': np.array([0, 0, 0]),
                 'geom_quat': np.array([1, 0, 1, 0]),
                 'mass': shin_mass,
-                'armature': knee_armature,
                 'damping': knee_damping,
             },
             'front_wheel': {
@@ -289,7 +282,6 @@ class GenModel():
                 'geom_pos': np.array([0, 0, 0]),
                 'geom_quat': np.array([1, 1, 0, 0]),
                 'mass': wheel_mass,
-                'armature': wheel_armature,
                 'damping': wheel_damping,
             },
             'rear_wheel': {
@@ -300,7 +292,6 @@ class GenModel():
                 'geom_pos': np.array([0, 0, 0]),
                 'geom_quat': np.array([1, 1, 0, 0]),
                 'mass': wheel_mass,
-                'armature': wheel_armature,
                 'damping': wheel_damping,
             },
         }
@@ -327,7 +318,6 @@ class GenModel():
                     type=mujoco.mjtJoint.mjJNT_HINGE,
                     name=joint_name,
                     axis=[0, 1, 0],
-                    armature = head_children_params[child]['armature'],
                     damping = head_children_params[child]['damping'],
                 )                
 
@@ -353,103 +343,148 @@ class GenModel():
                         mass=head_children_params[child]['mass'],
                         rgba = color,
                     )
+        self.spec = spec
 
 
 # Adding Actuators:
         # Back left leg
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='bl_hip',
             target='torso_left_thigh_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['hip_params'],
         )
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='bl_knee',
             target='torso_left_thigh_shin_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['knee_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='bl_wheel1',
             target='torso_left_shin_front_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='bl_wheel2',
             target='torso_left_shin_rear_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
 
         # Back right leg
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='br_hip',
             target='torso_right_thigh_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['hip_params'],
         )
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='br_knee',
             target='torso_right_thigh_shin_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['knee_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='br_wheel1',
             target='torso_right_shin_front_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='br_wheel2',
             target='torso_right_shin_rear_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
 
         # Front left leg
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='fl_hip',
             target='head_left_thigh_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['hip_params'],
         )
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='fl_knee',
             target='head_left_thigh_shin_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['knee_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='fl_wheel1',
             target='head_left_shin_front_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='fl_wheel2',
             target='head_left_shin_rear_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
 
         # Front right leg
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='fr_hip',
             target='head_right_thigh_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['hip_params'],
         )
-        spec.add_actuator(
+        self.add_pos_actuator(
             name='fr_knee',
             target='head_right_thigh_shin_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['knee_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='fr_wheel1',
             target='head_right_shin_front_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
-        spec.add_actuator(
+        self.add_vel_actuator(
             name='fr_wheel2',
             target='head_right_shin_rear_wheel_joint',
-            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            motor_params = motor_config['wheel_params'],
         )
-
-   
-
         self.spec = spec
 
 
 
+
+    def add_pos_actuator(self, 
+                        name: str,
+                        target: str,
+                        motor_params: dict):
+        ''' Helper function to add position actuators with consistent parameters and scaling based on motor config.'''
+        act = self.spec.add_actuator(
+            name = name,
+            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            target = target,
+        )
+        act.dyntype = mujoco.mjtDyn.mjDYN_NONE
+        act.gaintype = mujoco.mjtGain.mjGAIN_FIXED
+        act.biastype = mujoco.mjtBias.mjBIAS_AFFINE
+        max_torque = motor_params['stall_torque'] * motor_params['gear_ratio']
+        act.forcerange = [-max_torque, max_torque]
+        act.gear = [motor_params['gear_ratio'], 0, 0, 0, 0, 0]
+        act.armature = motor_params['rotor_inertia']
+
+        act.gainprm[0] = motor_params['Kp']
+        act.biasprm[0:3] = [0.0, -motor_params['Kp'], -motor_params['Kd']]
+        return act
+    
+    def add_vel_actuator(self, 
+                        name: str,
+                        target: str,
+                        motor_params: dict):
+        ''' Helper function to add velocity actuators with consistent parameters and scaling based on motor config.'''
+
+        act = self.spec.add_actuator(
+            name = name,
+            trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            target = target,
+        )
+        act.dyntype = mujoco.mjtDyn.mjDYN_NONE
+        act.gaintype = mujoco.mjtGain.mjGAIN_FIXED
+        act.biastype = mujoco.mjtBias.mjBIAS_AFFINE
+        max_torque = motor_params['stall_torque'] * motor_params['gear_ratio']
+        act.forcerange = [-max_torque, max_torque]
+        act.gear = [motor_params['gear_ratio'], 0, 0, 0, 0, 0]
+        act.armature = motor_params['rotor_inertia']
+        
+        act.gainprm[0] = motor_params['Kd']
+        act.biasprm[0:3] = [0.0, 0.0, -motor_params['Kd']]
+        return act
+    
+    
     def add_scene(self):
         # Create skybox so background isn't just black
         self.spec.add_texture(type = mujoco.mjtTexture.mjTEXTURE_SKYBOX,

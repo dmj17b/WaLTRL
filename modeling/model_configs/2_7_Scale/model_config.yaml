@@ -15,14 +15,14 @@ head_params:
 thigh_params: 
   length: 0.18
   width: 0.08
-  mass: 3.375
+  mass: 4.5
   torso_offset: [-0.108, 0.00, 0]
   head_offset: [0.027, 0.0, 0]
 
 shin_params: 
   length: 0.216
   width: 0.08
-  mass: 1.2
+  mass: 2.4
   offset: [0, 0.0, 0]
 
 wheel_params:
