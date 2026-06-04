@@ -15,6 +15,8 @@ from mujoco_playground._src import reward  # Import reward utilities (not used i
 from mujoco_playground._src.dm_control_suite import common  # Import common utilities for dm_control_suite.
 
 from modeling import GenModel
+import yaml
+from pathlib import Path
 
 from configs.base_config import SimConfig, RewardConfig, CommandConfig  # Import configuration dataclasses.
 
@@ -51,6 +53,17 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Define addresses for joints and actuators for easy access later
         self._define_addresses()
+
+        # Action scaling variables:
+        self.hip_action_scale = 0.75  # Scaling factor for hip joint actions to limit the range of motion
+        self.knee_action_scale = 0.5  # Scaling factor for knee joint actions to limit the range of motion
+        self.wheel_action_scale = 1.0  # Scaling factor for wheel joint velocities to limit the maximum speed
+
+        # Motor parameters:
+        self.motor_params = yaml.safe_load(Path(motor_config).read_text())  # Load motor parameters from the motor configuration file
+        self.hip_motor_params = self.motor_params["hip_params"]  # Extract hip motor parameters
+        self.knee_motor_params = self.motor_params["knee_params"]  # Extract knee motor parameters
+        self.wheel_motor_params = self.motor_params["wheel_params"]  # Extract
     
     def reset(self, rng: jax.Array) -> mjx_env.State:
         '''Reset the environment to an initial state.'''
@@ -71,6 +84,7 @@ class BaseEnv(mjx_env.MjxEnv):
             mocap_pos = mocap_pos,
             impl = self._config.impl,
             naconmax = self._config.naconmax,
+            njmax = self._config.njmax,
         )
 
         # Randomize initial command and time until command change
@@ -127,12 +141,59 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         '''Apply the given action to the environment and step the simulation forward.'''
-        pass
+        hip_actions = action[self.hip_act_ids]
+        knee_actions = action[self.knee_act_ids]
+        wheel_actions = action[self.wheel_act_ids]
 
+        hip_torques = self.hip_controller(state, hip_actions, state.info["rng"])
+        knee_torques = self.knee_controller(state, knee_actions, state.info["rng"])
+        wheel_torques = self.wheel_controller(state, wheel_actions, state.info["rng"])
 
-    def calculate_motor_targets(self, state: mjx_env.State, action: jax.Array, rng: jax.Array) -> jax.Array:
-        '''Calculate the target positions for the motors based on the current state, action, and command.'''
-        return jp.zeros_like(action)  # Placeholder implementation
+        torques = jp.zeros(self.mj_model.nu)
+        torques = torques.at[self.hip_act_ids].set(hip_torques)
+        torques = torques.at[self.knee_act_ids].set(knee_torques)
+        torques = torques.at[self.wheel_act_ids].set(wheel_torques)
+
+        data = mjx_env.step(
+            self.mjx_model,
+            state.data,
+            torques,
+            self.n_substeps
+        )
+
+        obs = self._get_policy_obs(data, state.info)
+        reward = 0.0  # Placeholder for reward calculation
+        done = jp.zeros(())  # Placeholder for episode termination condition
+        metrics = state.metrics
+        info = state.info
+
+        return mjx_env.State(data, obs, reward, done, metrics, info)
+
+    def hip_controller(self, state: mjx_env.State, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
+        '''Calculate the control signals for the hip motors based on the current state, action, and command.'''
+        hip_targets = self.hip_action_scale*hip_actions
+        des_torques = self.hip_motor_params["Kp"] * (hip_targets - state.data.qpos[self.hip_qposadrs]) + self.hip_motor_params["Kd"] * (0 - state.data.qvel[self.hip_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
+        actual_torques = self.motor_model(des_torques, state.data.qvel[self.hip_qveladrs], self.hip_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return des_torques
+
+    def knee_controller(self, state: mjx_env.State, knee_actions: jax.Array, rng: jax.Array) -> jax.Array:
+        '''Calculate the control signals for the knee motors based on the current state, action, and command.'''
+        knee_targets = state.data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
+        des_torques = self.knee_motor_params["Kp"] * (knee_targets - state.data.qpos[self.knee_qposadrs]) + self.knee_motor_params["Kd"] * (0 - state.data.qvel[self.knee_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
+        actual_torques = self.motor_model(des_torques, state.data.qvel[self.knee_qveladrs], self.knee_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return des_torques
+
+    def wheel_controller(self, state: mjx_env.State, wheel_actions: jax.Array, rng: jax.Array) -> jax.Array:
+        '''Calculate the control signals for the wheel motors based on the current state, action, and command.'''
+        wheel_targets = self.wheel_action_scale*wheel_actions  # Calculate target wheel velocities by scaling the actions
+        des_torques = self.wheel_motor_params["Kd"] * (wheel_targets - state.data.qvel[self.wheel_qveladrs])  # Velocity control law to calculate desired torques based on velocity error
+        actual_torques = self.motor_model(des_torques, state.data.qvel[self.wheel_qveladrs], self.wheel_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return des_torques
+    
+    def motor_model(self, des_torques: jax.Array, curr_vel: jax.Array, motor_params: dict) -> jax.Array:
+        '''NOT IMPLEMENTED: Placeholder to restrict desired torques based on motor speed-torque curves.'''
+        return des_torques  # Placeholder for motor model implementation that limits torques based on speed-torque curves
+
 
     def _get_policy_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract policy network observation from the simulation state'''
@@ -142,8 +203,8 @@ class BaseEnv(mjx_env.MjxEnv):
         knee_joint_positions = data.qpos[self.knee_qposadrs]
         knee_pos_sins = jp.sin(knee_joint_positions)
         knee_pos_coss = jp.cos(knee_joint_positions)
-        joint_velocities = data.qvel[self.qvel_idx]
-        joint_torques = data.qfrc_actuator[self.ctrl_idx]
+        joint_velocities = data.qvel[self.qvel_adrs]
+        joint_torques = data.qfrc_actuator[self.act_ids]
 
         obs = jp.concatenate([
             vel_commands,
@@ -161,7 +222,6 @@ class BaseEnv(mjx_env.MjxEnv):
         pass
 
     def sample_command(self, rng: jax.Array) -> jax.Array:
-
         # Split RNG keys
         rng, lin_vel_rng, ang_vel_rng, zero_rng = jax.random.split(rng, num=4)
         # Determine whether to sample a zero command based on the specified probability
@@ -208,75 +268,28 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def _define_addresses(self):
         '''Define convenient references to joint IDs and qpos addresses for easy access later.'''
-        self._joint_names = [
-            "head_left_thigh_joint", "head_left_thigh_shin_joint", "head_left_shin_front_wheel_joint", "head_left_shin_back_wheel_joint",
-            "head_right_thigh_joint", "head_right_thigh_shin_joint", "head_right_shin_front_wheel_joint", "head_right_shin_back_wheel_joint",
-            "torso_left_thigh_joint", "torso_left_thigh_shin_joint", "torso_left_shin_front_wheel_joint", "torso_left_shin_back_wheel_joint",
-            "torso_right_thigh_joint", "torso_right_thigh_shin_joint", "torso_right_shin_front_wheel_joint", "torso_right_shin_back_wheel_joint"
-        ]
-        self._knee_joint_names = [
-            "head_left_thigh_shin_joint", "head_right_thigh_shin_joint",
-            "torso_left_thigh_shin_joint", "torso_right_thigh_shin_joint"
-        ]
-        self._hip_joint_names = [
-            "head_left_thigh_joint", "head_right_thigh_joint",
-            "torso_left_thigh_joint", "torso_right_thigh_joint"
-        ]
-        self._wheel_joint_names = [
-            "head_left_shin_front_wheel_joint", "head_left_shin_back_wheel_joint",
-            "head_right_shin_front_wheel_joint", "head_right_shin_back_wheel_joint",
-            "torso_left_shin_front_wheel_joint", "torso_left_shin_back_wheel_joint",
-            "torso_right_shin_front_wheel_joint", "torso_right_shin_back_wheel_joint"
-        ]
-        self._actuator_names = [
-            "fl_hip", "fl_knee", "fl_wheel1", "fl_wheel2",
-            "fr_hip", "fr_knee", "fr_wheel1", "fr_wheel2",
-            "bl_hip", "bl_knee", "bl_wheel1", "bl_wheel2",
-            "br_hip", "br_knee", "br_wheel1", "br_wheel2"
-        ]
 
-        joint_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in self._joint_names]
-        knee_joint_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in self._knee_joint_names]
-        hip_joint_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in self._hip_joint_names]
-        wheel_joint_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_JOINT, name) for name in self._wheel_joint_names]
+        self.hip_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_hip", "fr_hip", "bl_hip", "br_hip"]])
+        self.knee_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_knee", "fr_knee", "bl_knee", "br_knee"]])
+        self.wheel_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in [
+            "fl_wheel1", "fl_wheel2", "fr_wheel1", "fr_wheel2",
+            "bl_wheel1", "bl_wheel2", "br_wheel1", "br_wheel2"
+        ]])  
+        self.act_ids = jp.concatenate([self.hip_act_ids, self.knee_act_ids, self.wheel_act_ids])  # Concatenate all actuator IDs for easy indexing
 
-        self.joint_qposadr = jp.array([self.mj_model.jnt_qposadr[jid] for jid in joint_ids])
-        self.knee_qposadrs = jp.array([self.mj_model.jnt_qposadr[jid] for jid in knee_joint_ids])
-        self.hip_qposadrs = jp.array([self.mj_model.jnt_qposadr[jid] for jid in hip_joint_ids])
-        self.wheel_qposadrs = jp.array([self.mj_model.jnt_qposadr[jid] for jid in wheel_joint_ids])
+        hip_jids = self.mj_model.actuator_trnid[self.hip_act_ids, 0]  # Get the joint IDs for the hip actuators
+        knee_jids = self.mj_model.actuator_trnid[self.knee_act_ids, 0]  # Get the joint IDs for the knee actuators
+        wheel_jids = self.mj_model.actuator_trnid[self.wheel_act_ids, 0]  # Get the joint IDs for the wheel actuators
 
-        # Note: qvel uses dofadr, not qposadr. For 1-DOF joints, dofadr is the qvel index.
-        self.qvel_idx = jp.array([self.mj_model.jnt_dofadr[jid] for jid in joint_ids]) 
-        self.knee_qveladrs = jp.array([self.mj_model.jnt_dofadr[jid] for jid in knee_joint_ids])
-        self.hip_qveladrs = jp.array([self.mj_model.jnt_dofadr[jid] for jid in hip_joint_ids])
-        self.wheel_qveladrs = jp.array([self.mj_model.jnt_dofadr[jid] for jid in wheel_joint_ids])
+        self.hip_qposadrs = self.mj_model.jnt_qposadr[hip_jids]  # Get the qpos addresses for the hip joints
+        self.knee_qposadrs = self.mj_model.jnt_qposadr[knee_jids]  # Get the qpos addresses for the knee joints
+        self.wheel_qposadrs = self.mj_model.jnt_qposadr[wheel_jids]  # Get the qpos addresses for the wheel joints
+        self.qpos_adrs = jp.concatenate([self.hip_qposadrs, self.knee_qposadrs, self.wheel_qposadrs])  # Concatenate all qpos addresses for easy indexing
 
-        self.ctrl_idx = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in self._actuator_names])
-
-
-        # Front left leg actuator addresses:
-        self.fl_hip_act_id = self.mj_model.actuator("fl_hip").id
-        self.fl_knee_act_id = self.mj_model.actuator("fl_knee").id
-        self.fl_wheel1_act_id = self.mj_model.actuator("fl_wheel1").id
-        self.fl_wheel2_act_id = self.mj_model.actuator("fl_wheel2").id
-
-        # Front right leg actuator addresses:
-        self.fr_hip_act_id = self.mj_model.actuator("fr_hip").id
-        self.fr_knee_act_id = self.mj_model.actuator("fr_knee").id
-        self.fr_wheel1_act_id = self.mj_model.actuator("fr_wheel1").id
-        self.fr_wheel2_act_id = self.mj_model.actuator("fr_wheel2").id
-
-        # Back left leg actuator addresses:
-        self.bl_hip_act_id = self.mj_model.actuator("bl_hip").id
-        self.bl_knee_act_id = self.mj_model.actuator("bl_knee").id
-        self.bl_wheel1_act_id = self.mj_model.actuator("bl_wheel1").id
-        self.bl_wheel2_act_id = self.mj_model.actuator("bl_wheel2").id
-
-        # Back right leg actuator addresses:
-        self.br_hip_act_id = self.mj_model.actuator("br_hip").id
-        self.br_knee_act_id = self.mj_model.actuator("br_knee").id
-        self.br_wheel1_act_id = self.mj_model.actuator("br_wheel1").id
-        self.br_wheel2_act_id = self.mj_model.actuator("br_wheel2").id 
+        self.hip_qveladrs = self.mj_model.jnt_dofadr[hip_jids]  # Get the qvel addresses for the hip joints
+        self.knee_qveladrs = self.mj_model.jnt_dofadr[knee_jids]  # Get the qvel addresses for the knee joints
+        self.wheel_qveladrs = self.mj_model.jnt_dofadr[wheel_jids]  # Get the qvel addresses for the wheel joints
+        self.qvel_adrs = jp.concatenate([self.hip_qveladrs, self.knee_qveladrs, self.wheel_qveladrs])  # Concatenate all qvel addresses for easy indexing
         
 
     def _add_terrain(self):

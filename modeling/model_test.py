@@ -24,7 +24,6 @@ js = joystick.Joystick(0)  # Initialize the first joystick
 js.init()
 
 
-
 def deadzone(value, threshold=0.1):
     """Applies a deadzone to joystick input to prevent drift."""
     if abs(value) < threshold:
@@ -39,7 +38,6 @@ with mujoco.viewer.launch_passive(m, d) as viewer:
 
         viewer.sync()  # Sync the viewer to update the visualization
 
-        d.ctrl[1] = 50  # Set a constant control input for testing
 
         mujoco.mj_step(m, d)  # Step the simulation forward
 

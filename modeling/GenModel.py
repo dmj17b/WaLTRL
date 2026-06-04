@@ -444,8 +444,6 @@ class GenModel():
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
         )
 
-   
-
         self.spec = spec
 
 

@@ -36,6 +36,7 @@ def SimConfig() -> config_dict.ConfigDict:
         episode_length = 3000,
         action_repeat = 1,
         impl = 'warp',
-        naconmax = 10*4096,
+        naconmax = 256,
+        njmax = 256,
     )
 

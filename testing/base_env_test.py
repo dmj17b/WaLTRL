@@ -20,6 +20,7 @@ def main():
     mj_data = mujoco.MjData(env.mj_model)
 
     dt = env.config.sim_dt
+    n_steps = 0
     with mujoco.viewer.launch_passive(env.mj_model, mj_data) as viewer:
         while viewer.is_running():
             # Keep track of step time
