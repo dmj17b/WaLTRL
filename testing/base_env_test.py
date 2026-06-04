@@ -21,12 +21,14 @@ def main():
 
     dt = env.config.sim_dt
     n_steps = 0
+
+    mj_data.qpos[2] = 0.5
+    
     with mujoco.viewer.launch_passive(env.mj_model, mj_data) as viewer:
         while viewer.is_running():
             # Keep track of step time
             start_time = time.time()
-            # Update the standard CPU mj_data with the new MJX state
-            mjx.get_data_into(mj_data, env.mj_model, state.data)
+
 
             viewer.sync()  # Sync the viewer to update the visualization
 
@@ -45,6 +47,8 @@ def main():
 
             state = step_fn(state, action)  # Step the environment
 
+            # Update the standard CPU mj_data with the new MJX state
+            mjx.get_data_into(mj_data, env.mj_model, state.data)
             n_steps += 1
 
             if n_steps > env.config.episode_length:

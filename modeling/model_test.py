@@ -44,8 +44,7 @@ with mujoco.viewer.launch_passive(m, d) as viewer:
         # Change qpos based on joystick states
         pygame.event.pump()  # Process event queue to update joystick state
 
-        d.qpos[0] += 0.01*deadzone(js.get_axis(0))  # Use the horizontal axis of the joystick to control x position
-        d.qpos[1] -= 0.01*deadzone(js.get_axis(3))  # Use the vertical axis of the joystick to control z position
+
 
 
         # Rudimentary time keeping, will drift relative to wall clock.
