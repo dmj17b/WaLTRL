@@ -2,34 +2,34 @@ waist_params:
   spring_stiffness: 10
   damping: 1
   range: [-25, 25]
-  frictionloss: 0.0
+  frictionloss: 0.1
 
 hip_params:
-  Kp: 10
-  Kd: 0.3
+  Kp: 350
+  Kd: 125
   stall_torque: 1.8
   no_load_speed: 8000
   gear_ratio: 160
   rotor_inertia: 0.002
   damping: 0.2
-  frictionloss: 0.0
+  frictionloss: 0.1
 
 knee_params:
-  Kp: 10
-  Kd: 0.3
+  Kp: 100
+  Kd: 30
   stall_torque: 1.8
   no_load_speed: 8000
   gear_ratio: 120
   rotor_inertia: 0.002
   damping: 0.2
-  frictionloss: 0.0
+  frictionloss: 0.1
 
 wheel_params:
   Kp: 0.0
-  Kd: 0.5
+  Kd: 150.0
   stall_torque: 1.8
   no_load_speed: 8000
   gear_ratio: 30
   rotor_inertia: 0.002
   damping: 0.2
-  frictionloss: 0.0
+  frictionloss: 0.1

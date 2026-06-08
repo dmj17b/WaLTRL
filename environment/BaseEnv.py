@@ -55,9 +55,9 @@ class BaseEnv(mjx_env.MjxEnv):
         self._define_addresses()
 
         # Action scaling variables:
-        self.hip_action_scale = 0.75  # Scaling factor for hip joint actions to limit the range of motion
-        self.knee_action_scale = 0.5  # Scaling factor for knee joint actions to limit the range of motion
-        self.wheel_action_scale = 1.0  # Scaling factor for wheel joint velocities to limit the maximum speed
+        self.hip_action_scale = 1.25  # Scaling factor for hip joint actions to limit the range of motion
+        self.knee_action_scale = 10.0  # Scaling factor for knee joint actions to limit the range of motion
+        self.wheel_action_scale = 33.0  # Scaling factor for wheel joint velocities to limit the maximum speed
 
         # Motor parameters:
         self.motor_params = yaml.safe_load(Path(motor_config).read_text())  # Load motor parameters from the motor configuration file
@@ -275,6 +275,23 @@ class BaseEnv(mjx_env.MjxEnv):
             "fl_wheel1", "fl_wheel2", "fr_wheel1", "fr_wheel2",
             "bl_wheel1", "bl_wheel2", "br_wheel1", "br_wheel2"
         ]])  
+        self.fl_hip_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fl_hip")
+        self.fr_hip_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fr_hip")
+        self.bl_hip_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "bl_hip")
+        self.br_hip_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "br_hip")
+        self.fl_knee_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fl_knee")
+        self.fr_knee_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fr_knee")
+        self.bl_knee_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "bl_knee")
+        self.br_knee_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "br_knee")
+        self.fl_wheel1_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fl_wheel1")
+        self.fl_wheel2_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fl_wheel2")
+        self.fr_wheel1_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fr_wheel1")
+        self.fr_wheel2_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "fr_wheel2")
+        self.bl_wheel1_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "bl_wheel1")
+        self.bl_wheel2_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "bl_wheel2")
+        self.br_wheel1_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "br_wheel1")
+        self.br_wheel2_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "br_wheel2")
+
         self.act_ids = jp.concatenate([self.hip_act_ids, self.knee_act_ids, self.wheel_act_ids])  # Concatenate all actuator IDs for easy indexing
 
         hip_jids = self.mj_model.actuator_trnid[self.hip_act_ids, 0]  # Get the joint IDs for the hip actuators
