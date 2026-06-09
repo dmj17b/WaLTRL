@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Add parent directory to path
-from typing import Any, Dict, Optional, Union  # Import type hints for function signatures.
+from typing import Any, Dict, Optional, Tuple, Union  # Import type hints for function signatures.
 import warnings  # Import warnings module (not used in this snippet).
 
 import jax  # Import JAX for numerical computing and random number generation.
@@ -43,7 +43,7 @@ class BaseEnv(mjx_env.MjxEnv):
         self.model_spec.add_scene()
         self._add_terrain()
         self._mj_model = self.model_spec.spec.compile()
-        self._mjx_model = mjx.put_model(self._mj_model, impl=self._config.impl)
+        self._mjx_model = mjx.put_model(m = self._mj_model, impl=self._config.impl)
 
         # Select the appropriate model based on the implementation specified in the configuration
         if(self._config.impl == 'warp'):
@@ -137,29 +137,55 @@ class BaseEnv(mjx_env.MjxEnv):
         qvel = jp.zeros(self.mj_model.nv)  # Start with default qvel
         return qvel
 
+    # SIMULATION Step - applies low level control loop to each simulation step
+    def _simulation_step(self, state: mjx_env.State, action: jax.Array, n_substeps: int) -> mjx.Data:
 
-
-    def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
-        '''Apply the given action to the environment and step the simulation forward.'''
+        data = state.data
         hip_actions = action[self.hip_act_ids]
         knee_actions = action[self.knee_act_ids]
         wheel_actions = action[self.wheel_act_ids]
 
-        hip_torques = self.hip_controller(state, hip_actions, state.info["rng"])
-        knee_torques = self.knee_controller(state, knee_actions, state.info["rng"])
-        wheel_torques = self.wheel_controller(state, wheel_actions, state.info["rng"])
+        def _substep(carry: mjx.Data, unused_t) -> Tuple[mjx.Data, None]:
+            # Apply PD Control laws
+            hip_torques = self.hip_controller(state, hip_actions, state.info["rng"])
+            knee_torques = self.knee_controller(state, knee_actions, state.info["rng"])
+            wheel_torques = self.wheel_controller(state, wheel_actions, state.info["rng"])
+            
+            # Combine torques into a single vector for all actuators:
+            torques = jp.zeros(self.mj_model.nu)
+            torques = torques.at[self.hip_act_ids].set(hip_torques)
+            torques = torques.at[self.knee_act_ids].set(knee_torques)
+            torques = torques.at[self.wheel_act_ids].set(wheel_torques)
 
-        torques = jp.zeros(self.mj_model.nu)
-        torques = torques.at[self.hip_act_ids].set(hip_torques)
-        torques = torques.at[self.knee_act_ids].set(knee_torques)
-        torques = torques.at[self.wheel_act_ids].set(wheel_torques)
+            data = carry.replace(ctrl = torques)
+            data = mjx.step(self._mjx_model, data)
+            return data, None
+        data, _ = jax.lax.scan(_substep, data, None, length=n_substeps)
+        return data
 
-        data = mjx_env.step(
-            self.mjx_model,
-            state.data,
-            torques,
-            self.n_substeps
-        )
+    def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
+        '''Apply the given action to the environment and step the simulation forward.'''
+        # hip_actions = action[self.hip_act_ids]
+        # knee_actions = action[self.knee_act_ids]
+        # wheel_actions = action[self.wheel_act_ids]
+
+        # hip_torques = self.hip_controller(state, hip_actions, state.info["rng"])
+        # knee_torques = self.knee_controller(state, knee_actions, state.info["rng"])
+        # wheel_torques = self.wheel_controller(state, wheel_actions, state.info["rng"])
+
+        # torques = jp.zeros(self.mj_model.nu)
+        # torques = torques.at[self.hip_act_ids].set(hip_torques)
+        # torques = torques.at[self.knee_act_ids].set(knee_torques)
+        # torques = torques.at[self.wheel_act_ids].set(wheel_torques)
+
+        # data = mjx_env.step(
+        #     self.mjx_model,
+        #     state.data,
+        #     torques,
+        #     self.n_substeps
+        # )
+
+        data = self._simulation_step(state, action, self.n_substeps)
 
         obs = self._get_policy_obs(data, state.info)
         reward = 0.0  # Placeholder for reward calculation

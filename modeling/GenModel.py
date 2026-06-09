@@ -71,7 +71,7 @@ class GenModel():
         hip_kp = motor_config['hip_params']['Kp']
         hip_kd = motor_config['hip_params']['Kd']
         hip_gear_ratio = motor_config['hip_params']['gear_ratio']
-        hip_stall_torque = motor_config['hip_params']['stall_torque']
+        hip_stall_torque = motor_config['hip_params']['stall_torque'] * hip_gear_ratio  # Convert rotor stall torque to joint stall torque
         hip_no_load_speed = motor_config['hip_params']['no_load_speed']
         hip_rotor_inertia = motor_config['hip_params']['rotor_inertia']
         hip_damping = motor_config['hip_params']['damping']
@@ -81,7 +81,7 @@ class GenModel():
         knee_kp = motor_config['knee_params']['Kp']
         knee_kd = motor_config['knee_params']['Kd']
         knee_gear_ratio = motor_config['knee_params']['gear_ratio']
-        knee_stall_torque = motor_config['knee_params']['stall_torque']
+        knee_stall_torque = motor_config['knee_params']['stall_torque'] * knee_gear_ratio  # Convert rotor stall torque to joint stall torque
         knee_no_load_speed = motor_config['knee_params']['no_load_speed']
         knee_rotor_inertia = motor_config['knee_params']['rotor_inertia']
         knee_damping = motor_config['knee_params']['damping']
@@ -92,7 +92,7 @@ class GenModel():
         wheel_kp = motor_config['wheel_params']['Kp']
         wheel_kd = motor_config['wheel_params']['Kd']
         wheel_gear_ratio = motor_config['wheel_params']['gear_ratio']
-        wheel_stall_torque = motor_config['wheel_params']['stall_torque']
+        wheel_stall_torque = motor_config['wheel_params']['stall_torque'] * wheel_gear_ratio  # Convert rotor stall torque to joint stall torque
         wheel_no_load_speed = motor_config['wheel_params']['no_load_speed']
         wheel_rotor_inertia = motor_config['wheel_params']['rotor_inertia']
         wheel_damping = motor_config['wheel_params']['damping']
@@ -361,21 +361,25 @@ class GenModel():
             name='bl_hip',
             target='torso_left_thigh_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-hip_stall_torque, hip_stall_torque],
         )
         spec.add_actuator(
             name='bl_knee',
             target='torso_left_thigh_shin_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-knee_stall_torque, knee_stall_torque],
         )
         spec.add_actuator(
             name='bl_wheel1',
             target='torso_left_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
         spec.add_actuator(
             name='bl_wheel2',
             target='torso_left_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
 
         # Back right leg
@@ -383,21 +387,25 @@ class GenModel():
             name='br_hip',
             target='torso_right_thigh_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-hip_stall_torque, hip_stall_torque],
         )
         spec.add_actuator(
             name='br_knee',
             target='torso_right_thigh_shin_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-knee_stall_torque, knee_stall_torque],
         )
         spec.add_actuator(
             name='br_wheel1',
             target='torso_right_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
         spec.add_actuator(
             name='br_wheel2',
             target='torso_right_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
 
         # Front left leg
@@ -405,21 +413,25 @@ class GenModel():
             name='fl_hip',
             target='head_left_thigh_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-hip_stall_torque, hip_stall_torque],
         )
         spec.add_actuator(
             name='fl_knee',
             target='head_left_thigh_shin_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-knee_stall_torque, knee_stall_torque],
         )
         spec.add_actuator(
             name='fl_wheel1',
             target='head_left_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
         spec.add_actuator(
             name='fl_wheel2',
             target='head_left_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
 
         # Front right leg
@@ -427,21 +439,25 @@ class GenModel():
             name='fr_hip',
             target='head_right_thigh_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-hip_stall_torque, hip_stall_torque],
         )
         spec.add_actuator(
             name='fr_knee',
             target='head_right_thigh_shin_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-knee_stall_torque, knee_stall_torque],
         )
         spec.add_actuator(
             name='fr_wheel1',
             target='head_right_shin_front_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
         spec.add_actuator(
             name='fr_wheel2',
             target='head_right_shin_rear_wheel_joint',
             trntype = mujoco.mjtTrn.mjTRN_JOINT,
+            forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
 
         self.spec = spec

@@ -80,7 +80,6 @@ def main():
         action[env.fr_hip_act_id] = build_action.front_splay
         action[env.bl_hip_act_id] = build_action.rear_splay
         action[env.br_hip_act_id] = build_action.rear_splay
-        print(f"Hip actions: Front Splay={build_action.front_splay:.2f}, Rear Splay={build_action.rear_splay:.2f}")
         return action
     
 
