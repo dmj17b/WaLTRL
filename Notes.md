@@ -4,7 +4,7 @@
 - [ ] Joint Pos Reset
 - [ ] Base Pos Reset
 - [ ] Joint Vel Reset
-- [ ] Action space mapping
+- [x] Action space mapping
 - [ ] Policy Observation getter
   - [ ] Observation noise
 - [ ] Value Observation getter

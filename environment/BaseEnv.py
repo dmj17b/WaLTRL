@@ -18,7 +18,7 @@ from modeling import GenModel
 import yaml
 from pathlib import Path
 
-from configs.base_config import SimConfig, RewardConfig, CommandConfig  # Import configuration dataclasses.
+from configs.base_config import SimConfig, RewardConfig, CommandConfig, NoiseConfig  # Import configuration dataclasses.
 
 class BaseEnv(mjx_env.MjxEnv):
     """Base Environment class for WaLTER DRL Training."""
@@ -56,7 +56,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Action scaling variables:
         self.hip_action_scale = 1.25  # Scaling factor for hip joint actions to limit the range of motion
-        self.knee_action_scale = 10.0  # Scaling factor for knee joint actions to limit the range of motion
+        self.knee_action_scale = 2.5  # Scaling factor for knee joint actions to limit the range of motion
         self.wheel_action_scale = 33.0  # Scaling factor for wheel joint velocities to limit the maximum speed
 
         # Motor parameters:
@@ -64,6 +64,9 @@ class BaseEnv(mjx_env.MjxEnv):
         self.hip_motor_params = self.motor_params["hip_params"]  # Extract hip motor parameters
         self.knee_motor_params = self.motor_params["knee_params"]  # Extract knee motor parameters
         self.wheel_motor_params = self.motor_params["wheel_params"]  # Extract
+
+        # Noise config:
+        self.noise_config = NoiseConfig()  # Initialize noise configuration with default values
     
     def reset(self, rng: jax.Array) -> mjx_env.State:
         '''Reset the environment to an initial state.'''
@@ -165,25 +168,6 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         '''Apply the given action to the environment and step the simulation forward.'''
-        # hip_actions = action[self.hip_act_ids]
-        # knee_actions = action[self.knee_act_ids]
-        # wheel_actions = action[self.wheel_act_ids]
-
-        # hip_torques = self.hip_controller(state, hip_actions, state.info["rng"])
-        # knee_torques = self.knee_controller(state, knee_actions, state.info["rng"])
-        # wheel_torques = self.wheel_controller(state, wheel_actions, state.info["rng"])
-
-        # torques = jp.zeros(self.mj_model.nu)
-        # torques = torques.at[self.hip_act_ids].set(hip_torques)
-        # torques = torques.at[self.knee_act_ids].set(knee_torques)
-        # torques = torques.at[self.wheel_act_ids].set(wheel_torques)
-
-        # data = mjx_env.step(
-        #     self.mjx_model,
-        #     state.data,
-        #     torques,
-        #     self.n_substeps
-        # )
 
         data = self._simulation_step(state, action, self.n_substeps)
 
@@ -221,20 +205,58 @@ class BaseEnv(mjx_env.MjxEnv):
         return des_torques  # Placeholder for motor model implementation that limits torques based on speed-torque curves
 
 
+
     def _get_policy_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract policy network observation from the simulation state'''
+        
+        # Forward and angular velocity commands
         vel_commands = info["command"]
+
+        # Previous action (for action smoothing penalty)
         prev_action = info["prev_action"]
-        hip_joint_positions = data.qpos[self.hip_qposadrs]
-        knee_joint_positions = data.qpos[self.knee_qposadrs]
+
+        # Body roll and pitch:
+        
+
+
+        # Body accelerometer and gyroscope readings:
+        accel_rng, rng = jax.random.split(info["rng"])
+        accel_noise = jax.random.normal(accel_rng, shape=(self.body_accel_dim,)) * self.noise_config.body_accel_std  # Generate noise for body accelerometer and gyroscope readings based on the specified standard deviation in the noise configuration
+        body_accel = data.sensordata[self.body_accel_adrs:self.body_accel_adrs+self.body_accel_dim] + accel_noise  # Add noise to the body accelerometer and gyroscope readings for observation
+
+        # Body gyroscope readings:
+        gyro_rng, rng = jax.random.split(rng)
+        gyro_noise = jax.random.normal(gyro_rng, shape=(self.body_gyro_dim,)) * self.noise_config.body_gyro_std  # Generate noise for body gyroscope readings based on the specified standard deviation in the noise configuration
+        body_gyro = data.sensordata[self.body_gyro_adrs:self.body_gyro_adrs+self.body_gyro_dim] + gyro_noise  # Add noise to the body gyroscope readings for observation
+
+        # Hip Joint Positions and Velocities:
+        hip_pos_rng, rng = jax.random.split(info["rng"])
+        hip_pos_noise = jax.random.normal(hip_pos_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for hip joint positions based on the specified standard deviation in the noise configuration
+        hip_joint_positions = data.qpos[self.hip_qposadrs] + hip_pos_noise  # Add noise to the hip joint positions for observation
+
+        # Knee Joint Positions:
+        knee_pos_rng, rng = jax.random.split(rng)
+        knee_pos_noise = jax.random.normal(knee_pos_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for knee joint positions based on the specified standard deviation in the noise configuration
+        knee_joint_positions = data.qpos[self.knee_qposadrs] + knee_pos_noise  # Add noise to the knee joint positions for observation
         knee_pos_sins = jp.sin(knee_joint_positions)
         knee_pos_coss = jp.cos(knee_joint_positions)
-        joint_velocities = data.qvel[self.qvel_adrs]
-        joint_torques = data.qfrc_actuator[self.act_ids]
+        
+        # Joint Velocities"
+        joint_vel_rng, rng = jax.random.split(rng)
+        joint_vel_noise = jax.random.normal(joint_vel_rng, shape=(self.mj_model.nu,)) * self.noise_config.joint_vel_std  # Generate noise for joint velocities based on the specified standard deviation in the noise configuration
+        joint_velocities = data.qvel[self.qvel_adrs] + joint_vel_noise  # Add noise to the joint velocities for observation
 
+        # Torque noise:
+        torque_rng, rng = jax.random.split(rng)
+        torque_noise = jax.random.normal(torque_rng, shape=(self.mj_model.nu,)) * self.noise_config.torque_std  # Generate noise for torques based on the specified standard deviation in the noise configuration
+        joint_torques = data.qfrc_actuator[self.act_ids] + torque_noise  # Add noise to the joint torques for observation
+
+        # Concatenate everything into observation vector:
         obs = jp.concatenate([
             vel_commands,
             prev_action,
+            body_accel,
+            body_gyro,
             hip_joint_positions,
             knee_pos_sins,
             knee_pos_coss,
@@ -294,7 +316,6 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def _define_addresses(self):
         '''Define convenient references to joint IDs and qpos addresses for easy access later.'''
-
         self.hip_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_hip", "fr_hip", "bl_hip", "br_hip"]])
         self.knee_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_knee", "fr_knee", "bl_knee", "br_knee"]])
         self.wheel_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in [
@@ -334,6 +355,17 @@ class BaseEnv(mjx_env.MjxEnv):
         self.wheel_qveladrs = self.mj_model.jnt_dofadr[wheel_jids]  # Get the qvel addresses for the wheel joints
         self.qvel_adrs = jp.concatenate([self.hip_qveladrs, self.knee_qveladrs, self.wheel_qveladrs])  # Concatenate all qvel addresses for easy indexing
         
+        # Sensor addresses:
+        self.body_lin_vel_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_lin_vel")  # Get the sensor ID for the body linear velocity sensor
+        self.body_lin_vel_adrs = self.mj_model.sensor_adr[self.body_lin_vel_sensor_id]  # Get the addresses for the body linear velocity sensor
+        self.body_lin_vel_dim = self.mj_model.sensor_dim[self.body_lin_vel_sensor_id]  # Get the dimensionality of the body linear velocity sensor
+        self.body_accel_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_accel")  # Get the sensor ID for the body accelerometer
+        self.body_accel_adrs = self.mj_model.sensor_adr[self.body_accel_sensor_id]  # Get the addresses for the body accelerometer
+        self.body_accel_dim = self.mj_model.sensor_dim[self.body_accel_sensor_id]  # Get the dimensionality of the body accelerometer
+        self.body_gyro_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_gyro")  # Get the sensor ID for the body gyroscope
+        self.body_gyro_adrs = self.mj_model.sensor_adr[self.body_gyro_sensor_id]  # Get the addresses for the body gyroscope
+        self.body_gyro_dim = self.mj_model.sensor_dim[self.body_gyro_sensor_id]  # Get the dimensionality of the body gyroscope
+
 
     def _add_terrain(self):
         self.model_spec.add_groundplane()

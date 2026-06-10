@@ -29,6 +29,16 @@ class CommandConfig:
     zero_lin_prob: float = 0.1
     zero_ang_prob: float = 0.1
 
+
+@flax.struct.dataclass
+class NoiseConfig:
+    joint_pos_std: float = 0.01
+    joint_vel_std: float = 0.1
+    torque_std: float = 0.01
+    body_accel_std: float = 0.01
+    body_gyro_std: float = 0.01
+
+
 def SimConfig() -> config_dict.ConfigDict:
     return config_dict.create(
         ctrl_dt = 0.02,
@@ -39,4 +49,3 @@ def SimConfig() -> config_dict.ConfigDict:
         naconmax = 256,
         njmax = 256,
     )
-

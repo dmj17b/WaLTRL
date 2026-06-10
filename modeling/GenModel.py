@@ -119,6 +119,14 @@ class GenModel():
             mass=torso_mass,
             rgba = color,
         )
+        # Add sensor site to torso:
+        torso_body.add_site(
+            name = 'torso_com',
+            pos = [0.15, 0, 0],
+            type = mujoco.mjtGeom.mjGEOM_SPHERE,
+            rgba = [1, 0, 0, 1],
+            size = [0.05, 0.05, 0.05],
+            )
 
         # Torso Kinematic Chain:
         parents = ['torso', 'thigh', 'shin', 'shin']
@@ -252,6 +260,14 @@ class GenModel():
             mass=head_mass,
             rgba = color,
         )
+        # Add sensor site to head:
+        head_body.add_site(
+            name = 'head_com',
+            pos = [0.0, 0, 0],
+            type = mujoco.mjtGeom.mjGEOM_SPHERE,
+            rgba = [1, 0, 0, 1],
+            size = [0.05, 0.05, 0.05],
+            )
 
         # Head Kinematic Chain:
         parents = ['head', 'thigh', 'shin', 'shin']
@@ -460,7 +476,30 @@ class GenModel():
             forcerange = [-wheel_stall_torque, wheel_stall_torque],
         )
 
+        # Add linear velocity sensor:
+        spec.add_sensor(
+            name = 'torso_lin_vel',
+            type = mujoco.mjtSensor.mjSENS_VELOCIMETER,
+            objname = 'torso_com',
+            objtype = mujoco.mjtObj.mjOBJ_SITE,
+        )
+        # Add accelerometer and gyroscope sensors:
+        spec.add_sensor(
+            name = 'torso_accel',
+            type = mujoco.mjtSensor.mjSENS_ACCELEROMETER,
+            objname = 'torso_com',
+            objtype = mujoco.mjtObj.mjOBJ_SITE,
+        )
+        spec.add_sensor(
+            name = 'torso_gyro',
+            type = mujoco.mjtSensor.mjSENS_GYRO,
+            objname = 'torso_com',
+            objtype = mujoco.mjtObj.mjOBJ_SITE,
+        )
+
         self.spec = spec
+
+
 
 
 

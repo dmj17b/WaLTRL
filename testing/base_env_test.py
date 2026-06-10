@@ -11,6 +11,7 @@ import numpy as np
 from environment.BaseEnv import BaseEnv
 import pygame
 from pygame import joystick
+import matplotlib.pyplot as plt
 
 
 
@@ -23,7 +24,7 @@ def main():
     state = reset_fn(key)
     mj_data = mujoco.MjData(env.mj_model)
 
-    dt = env.config.sim_dt
+    dt = env.config.ctrl_dt
     n_steps = 0
 
     mj_data.qpos[2] = 0.5
@@ -106,6 +107,10 @@ def main():
             action = build_action()
 
             state = step_fn(state, action)  # Step the environment
+
+            vel_data = state.data.sensordata[env.body_lin_vel_adrs:env.body_lin_vel_adrs+env.body_lin_vel_dim]  # Extract linear velocity data from the state
+            print(f"Body linear vel: {vel_data[0]}")  # Print the body linear velocity for debugging
+
 
             # Update the standard CPU mj_data with the new MJX state
             mjx.get_data_into(mj_data, env.mj_model, state.data)
