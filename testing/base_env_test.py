@@ -23,11 +23,10 @@ def main():
 
     state = reset_fn(key)
     mj_data = mujoco.MjData(env.mj_model)
-
+    # mj_data.qpos = state.data.qpos
     dt = env.config.ctrl_dt
     n_steps = 0
 
-    mj_data.qpos[2] = 0.5
     
     # Initialize Pygame and the joystick
     pygame.init()
@@ -83,12 +82,12 @@ def main():
         action[env.br_hip_act_id] = build_action.rear_splay
         return action
     
+    print("Initial command: ", state.info["command"])
 
     with mujoco.viewer.launch_passive(env.mj_model, mj_data) as viewer:
         while viewer.is_running():
             # Keep track of step time
             start_time = time.time()
-
 
             viewer.sync()  # Sync the viewer to update the visualization
 
@@ -103,23 +102,32 @@ def main():
                 )
             )
 
+            print(f"QPos: {state.data.qpos[2]}")
+
             # Substitute joystick actions for testing:
             action = build_action()
 
-            state = step_fn(state, action)  # Step the environment
-
-            vel_data = state.data.sensordata[env.body_lin_vel_adrs:env.body_lin_vel_adrs+env.body_lin_vel_dim]  # Extract linear velocity data from the state
-            print(f"Body linear vel: {vel_data[0]}")  # Print the body linear velocity for debugging
-
-
-            # Update the standard CPU mj_data with the new MJX state
-            mjx.get_data_into(mj_data, env.mj_model, state.data)
-            n_steps += 1
+            # Reset conditions:
+            if state.done:
+                print("Episode done. Resetting environment.")
+                state = reset_fn(key)  # Reset the environment if the episode is done
+                n_steps = 0
 
             if n_steps > env.config.episode_length:
                 key, subkey = jax.random.split(key)
                 state = reset_fn(subkey)  # Reset the environment after 2000 steps for testing purposes
                 n_steps = 0
+            state = step_fn(state, action)  # Step the environment
+
+            vel_data = state.data.sensordata[env.body_lin_vel_adrs:env.body_lin_vel_adrs+env.body_lin_vel_dim]  # Extract linear velocity data from the state
+            # print(f"angular velocity: {state.data.qvel[env.torso_qveladr+5]:.3f}, linear velocity: {vel_data[0]:.3f}, reward: {state.reward:.3f}")  # Print the current angular velocity, linear velocity, and reward for debugging purposes
+            up_vector = state.data.sensordata[env.body_upvec_adrs:env.body_upvec_adrs + env.body_upvec_dim]  # Extract the body up vector from the sensor data
+            # print(f"Up vector deviation: {jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))}, UpVector Z: {up_vector[2]}")  # Print the squared distance of the up vector from the ideal up vector for debugging purposes
+            # Update the standard CPU mj_data with the new MJX state
+            mjx.get_data_into(mj_data, env.mj_model, state.data)
+            n_steps += 1
+
+
 
             elapsed = time.time()-start_time
             if elapsed < dt:

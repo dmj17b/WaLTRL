@@ -3,7 +3,7 @@ torso_params:
   width: 0.216
   height: 0.18
   mass: 36
-  start_pos: [0, 0, 0.5]
+  start_pos: [0, 0, 0.3]
 
 head_params:
   length: 0.3

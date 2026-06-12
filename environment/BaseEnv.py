@@ -132,6 +132,8 @@ class BaseEnv(mjx_env.MjxEnv):
     def _reset_model_qpos(self, pos_rng: jax.Array) -> jax.Array:
         '''Randomize the initial position of the model within a specified range.'''
         qpos = jp.zeros(self.mj_model.nq)  # Start with default qpos
+        qpos = qpos.at[3].set(1.0) # Initial rotation quaternion (w component)
+        qpos = qpos.at[2].set(0.3) # Initial height of the torso above the ground
         return qpos
 
 
@@ -166,18 +168,49 @@ class BaseEnv(mjx_env.MjxEnv):
         data, _ = jax.lax.scan(_substep, data, None, length=n_substeps)
         return data
 
+    # MAIN STEP FUNCTION
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         '''Apply the given action to the environment and step the simulation forward.'''
 
         data = self._simulation_step(state, action, self.n_substeps)
 
         obs = self._get_policy_obs(data, state.info)
-        reward = 0.0  # Placeholder for reward calculation
+        reward = self._get_reward(data, action, state.info, state.metrics)
         done = jp.zeros(())  # Placeholder for episode termination condition
         metrics = state.metrics
         info = state.info
 
+        # Check for rollover/pitchover failure based on the body up vector:
+        upvec = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs + self.body_upvec_dim]
+        done = jp.where(upvec[2] < -0.1, 1.0, done)  # Terminate episode if the up vector's Z component is less than -0.1 (indicating a fallover)
+
         return mjx_env.State(data, obs, reward, done, metrics, info)
+    
+    # REWARD FUNCTION
+    def _get_reward(self, 
+                    data: mjx.Data, 
+                    action: jax.Array,
+                    info: Dict[str,Any],
+                    metrics: Dict[str, Any]) -> jax.Array:
+        '''Basic reward function. This will likely be overwritten for most other environments, but common reward components can be implemented here.'''
+        # Tracking rewards:
+        lin_vel_tracking_reward = self.tracking_reward(info["command"][0], data.sensordata[self.body_lin_vel_adrs])  # Calculate linear velocity tracking reward based on the current command and the body linear velocity from the sensor data
+        ang_vel_tracking_reward = self.tracking_reward(info["command"][1], data.qvel[self.torso_qveladr+5])  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
+
+        # Orientation Penalty:
+        # up_vector = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs+2]  # Extract the body up vector from the sensor data
+
+        metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
+        metrics["reward/ang_vel_tracking"] = ang_vel_tracking_reward  # Log the angular velocity tracking reward in the metrics dictionary
+
+        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward  # Calculate the total episode reward as the sum of the linear and angular velocity tracking rewards
+
+        return episode_reward
+
+    def tracking_reward(self, desired, actual, sigma=0.25):
+        error = desired - actual
+        reward = jp.exp(-0.5 * (error / sigma) ** 2)
+        return reward
 
     def hip_controller(self, state: mjx_env.State, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
         '''Calculate the control signals for the hip motors based on the current state, action, and command.'''
@@ -214,10 +247,6 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Previous action (for action smoothing penalty)
         prev_action = info["prev_action"]
-
-        # Body roll and pitch:
-        
-
 
         # Body accelerometer and gyroscope readings:
         accel_rng, rng = jax.random.split(info["rng"])
@@ -355,6 +384,13 @@ class BaseEnv(mjx_env.MjxEnv):
         self.wheel_qveladrs = self.mj_model.jnt_dofadr[wheel_jids]  # Get the qvel addresses for the wheel joints
         self.qvel_adrs = jp.concatenate([self.hip_qveladrs, self.knee_qveladrs, self.wheel_qveladrs])  # Concatenate all qvel addresses for easy indexing
         
+        # Torso and Head IDs:
+        self.torso_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "torso")  # Get the body ID for the torso
+        self.torso_qveladr = self.mj_model.body_dofadr[self.torso_body_id]  # Get the qvel address for the torso body
+
+        self.head_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "head")  # Get the body ID for the head
+        self.head_qveladr = self.mj_model.body_dofadr[self.head_body_id]  # Get the qvel address for the head body
+
         # Sensor addresses:
         self.body_lin_vel_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_lin_vel")  # Get the sensor ID for the body linear velocity sensor
         self.body_lin_vel_adrs = self.mj_model.sensor_adr[self.body_lin_vel_sensor_id]  # Get the addresses for the body linear velocity sensor
@@ -365,6 +401,10 @@ class BaseEnv(mjx_env.MjxEnv):
         self.body_gyro_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_gyro")  # Get the sensor ID for the body gyroscope
         self.body_gyro_adrs = self.mj_model.sensor_adr[self.body_gyro_sensor_id]  # Get the addresses for the body gyroscope
         self.body_gyro_dim = self.mj_model.sensor_dim[self.body_gyro_sensor_id]  # Get the dimensionality of the body gyroscope
+
+        self.body_upvec_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_upvec")  # Get the sensor ID for the body up vector sensor
+        self.body_upvec_adrs = self.mj_model.sensor_adr[self.body_upvec_sensor_id]  # Get the addresses for the body up vector sensor
+        self.body_upvec_dim = self.mj_model.sensor_dim[self.body_upvec_sensor_id]  # Get the dimensionality of the body up vector sensor
 
 
     def _add_terrain(self):
