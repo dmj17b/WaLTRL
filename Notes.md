@@ -10,6 +10,7 @@
 - [ ] Value Observation getter
 - [ ] Motor Target Calculations
 - [ ] Motor Models
+- [ ] Define contact pairs for wheels
 
 # Questions to answer/things to figure out
 - [x] Where should I add in armature?

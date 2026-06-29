@@ -15,6 +15,7 @@ class GenModel():
         self,
         model_config_path: Any,
         motor_config_path: Any,
+        include_waist_joint: bool = True,
     ) -> None:
         # Build model using Mujoco Spec:
         spec = mujoco.MjSpec()
@@ -100,6 +101,9 @@ class GenModel():
 
         wheel_armature = wheel_rotor_inertia*wheel_gear_ratio**2
 
+        # Turn off contacts for all bodies:
+        spec.default.geom.contype = 0
+        spec.default.geom.conaffinity = 0
 
         # Add Torso to World Body:
         torso_body = spec.worldbody.add_body(
@@ -118,6 +122,7 @@ class GenModel():
             ],
             mass=torso_mass,
             rgba = color,
+            name = 'torso_geom',
         )
         # Add sensor site to torso:
         torso_body.add_site(
@@ -243,15 +248,16 @@ class GenModel():
             pos=head_position,
             quat=[1, 0, 0, 0],
         )
-        head_body.add_joint(
-            type=mujoco.mjtJoint.mjJNT_HINGE,
-            name='head_joint',
-            pos=joint_position,
-            axis=[1, 0, 0],
-            stiffness = waist_spring_stiffness,
-            damping = waist_damping,
-            range = waist_range,
-        )
+        if include_waist_joint:
+            head_body.add_joint(
+                type=mujoco.mjtJoint.mjJNT_HINGE,
+                name='head_joint',
+                pos=joint_position,
+                axis=[1, 0, 0],
+                stiffness = waist_spring_stiffness,
+                damping = waist_damping,
+                range = waist_range,
+            )
         head_body.add_geom(
             type=mujoco.mjtGeom.mjGEOM_BOX,
             size=[head_length / 2, head_width / 2, head_height / 2],
@@ -259,6 +265,7 @@ class GenModel():
             quat=[1, 0, 0, 0],
             mass=head_mass,
             rgba = color,
+            name = 'head_geom',
         )
         # Add sensor site to head:
         head_body.add_site(
@@ -505,11 +512,89 @@ class GenModel():
             objtype = mujoco.mjtObj.mjOBJ_SITE,
         )
 
+
         self.spec = spec
 
 
+    def add_contact_pairs(self,
+                          added_obstacles: list = None):
+        # Add contact pairs for wheel-ground interactions:
+        wheel_names = [
+            'torso_left_front_wheel_geom',
+            'torso_left_rear_wheel_geom',
+            'torso_right_front_wheel_geom',
+            'torso_right_rear_wheel_geom',
+            'head_left_front_wheel_geom',
+            'head_left_rear_wheel_geom',
+            'head_right_front_wheel_geom',
+            'head_right_rear_wheel_geom',
+        ]
+        shin_names = [
+            'torso_left_shin_geom',
+            'torso_right_shin_geom',
+            'head_left_shin_geom',
+            'head_right_shin_geom',]
+        
+        # Head and Torso to Floor Contact Pairs:
+        self.spec.add_pair(
+            geomname1 = 'torso_geom',
+            geomname2 = 'floor',
+        )
+        self.spec.add_pair(
+            geomname1 = 'head_geom',
+            geomname2 = 'floor',
+        )
 
+        # Wheel - Floor Contact Pairs:
+        for wheel_name in wheel_names:
+            self.spec.add_pair(
+                geomname1 = wheel_name,
+                geomname2 = 'floor',
+            )
+        # Shin - Floor Contact Pairs:
+        for shin_name in shin_names:
+            self.spec.add_pair(
+                geomname1 = shin_name,
+                geomname2 = 'floor',
+            )
+        # Wheel-Wheel Contact Pairs:
+        for i in range(len(wheel_names)):
+            if 'left' in wheel_names[i] and 'torso' in wheel_names[i]:
+                for j in range(len(wheel_names)):
+                    if 'left' in wheel_names[j] and 'head' in wheel_names[j]:
+                        self.spec.add_pair(
+                            geomname1 = wheel_names[i],
+                            geomname2 = wheel_names[j],
+                        )
+            if 'right' in wheel_names[i] and 'torso' in wheel_names[i]:
+                for j in range(len(wheel_names)):
+                    if 'right' in wheel_names[j] and 'head' in wheel_names[j]:
+                        self.spec.add_pair(
+                            geomname1 = wheel_names[i],
+                            geomname2 = wheel_names[j],
+                        )
 
+        # If additional obstacles are provided, add contact pairs for them:
+        if added_obstacles is not None:
+            for obstacle in added_obstacles:
+                self.spec.add_pair(
+                    geomname1 = 'torso_geom',
+                    geomname2 = obstacle,
+                )
+                self.spec.add_pair(
+                    geomname1 = 'head_geom',
+                    geomname2 = obstacle,
+                )
+                for wheel_name in wheel_names:
+                    self.spec.add_pair(
+                        geomname1 = wheel_name,
+                        geomname2 = obstacle,
+                    )
+                for shin_name in shin_names:
+                    self.spec.add_pair(
+                        geomname1 = shin_name,
+                        geomname2 = obstacle,
+                    )
 
     def add_scene(self):
         # Create skybox so background isn't just black
@@ -548,6 +633,7 @@ class GenModel():
             type=mujoco.mjtGeom.mjGEOM_PLANE,
             size=[0, 0, 0.05],
             material="groundplane_material",
+            name = 'floor',
         )
 
 
@@ -585,6 +671,7 @@ class GenModel():
             size = [d/2, length/2, d],
             pos = [pos[0], pos[1], d/2],
             quat = [1, 0, 1, 0],
+            name = 'log'
         )
         
     def add_incline(self, angle_deg: float = 30, length: float = 5.0, pos: list = [0,3,2], width: float = 2):

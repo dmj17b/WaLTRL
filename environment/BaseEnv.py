@@ -39,7 +39,7 @@ class BaseEnv(mjx_env.MjxEnv):
         # Generate WaLTER model spec, then add appropriate terrain/lighting elements
         model_config = 'modeling/model_configs/2_7_Scale/model_config.yaml'
         motor_config = 'modeling/model_configs/2_7_Scale/motor_config.yaml'
-        self.model_spec = GenModel.GenModel(model_config, motor_config)
+        self.model_spec = GenModel.GenModel(model_config, motor_config, include_waist_joint=False)  # Generate the model specification
         self.model_spec.add_scene()
         self._add_terrain()
         self._mj_model = self.model_spec.spec.compile()
@@ -198,7 +198,9 @@ class BaseEnv(mjx_env.MjxEnv):
         ang_vel_tracking_reward = self.tracking_reward(info["command"][1], data.qvel[self.torso_qveladr+5])  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
 
         # Orientation Penalty:
-        # up_vector = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs+2]  # Extract the body up vector from the sensor data
+        up_vector = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs+self.body_upvec_dim]  # Extract the body up vector from the sensor data
+        orientation_penalty = jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))  # Calculate the squared distance of the up vector from the ideal up vector (0, 0, 1) for orientation penalty
+
 
         metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
         metrics["reward/ang_vel_tracking"] = ang_vel_tracking_reward  # Log the angular velocity tracking reward in the metrics dictionary
@@ -293,10 +295,11 @@ class BaseEnv(mjx_env.MjxEnv):
             joint_torques
             ])
         return obs
-
+    
     def _get_value_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract value network observation from the simulation state'''
         pass
+
 
     def sample_command(self, rng: jax.Array) -> jax.Array:
         # Split RNG keys
@@ -407,8 +410,13 @@ class BaseEnv(mjx_env.MjxEnv):
         self.body_upvec_dim = self.mj_model.sensor_dim[self.body_upvec_sensor_id]  # Get the dimensionality of the body up vector sensor
 
 
+
     def _add_terrain(self):
+        '''Defines the terrain for the environment and then applies necessary contact pairs.
+        Make sure to update this function and contact pairs for every new environment.'''
         self.model_spec.add_groundplane()
+        self.model_spec.add_contact_pairs()  # Add contact pairs for wheel-ground interactions
+
 
     def _reset_terrain(self, terrain_rng: jax.Array) -> jax.Array:
         ''' Placeholder for randomizing terrain features.'''
