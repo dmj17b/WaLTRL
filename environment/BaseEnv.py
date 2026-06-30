@@ -130,7 +130,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
 
         # Get initial observation:
-        obs = self._get_policy_obs(data, info)
+        obs, info = self._get_policy_obs(data, info)
 
         return mjx_env.State(data, obs, reward, done, metrics, info)
 
