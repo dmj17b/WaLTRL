@@ -1,0 +1,40 @@
+{
+  "os":  "Linux-6.8.0-124-generic-x86_64-with-glibc2.39",
+  "python":  "CPython 3.12.3",
+  "startedAt":  "2026-06-30T15:47:45.121051Z",
+  "program":  "/home/orl1/Repos/WaLTRL/train/base_train.py",
+  "codePath":  "train/base_train.py",
+  "codePathLocal":  "train/base_train.py",
+  "git":  {
+    "remote":  "git@github.com:dmj17b/WaLTRL.git",
+    "commit":  "c2e63906a21e70694bc055e5161587dc9c261bdf"
+  },
+  "email":  "davidjayfsu@gmail.com",
+  "root":  "/home/orl1/Repos/WaLTRL",
+  "host":  "orl1-US-Desktop-Aegis-RS",
+  "executable":  "/home/orl1/Repos/WaLTRL/env/bin/python",
+  "cpu_count":  16,
+  "cpu_count_logical":  24,
+  "gpu":  "NVIDIA GeForce RTX 4070 Ti",
+  "gpu_count":  1,
+  "disk":  {
+    "/":  {
+      "total":  "1967317549056",
+      "used":  "423669346304"
+    }
+  },
+  "memory":  {
+    "total":  "33475174400"
+  },
+  "gpu_nvidia":  [
+    {
+      "name":  "NVIDIA GeForce RTX 4070 Ti",
+      "memoryTotal":  "12878610432",
+      "cudaCores":  7680,
+      "architecture":  "Ada",
+      "uuid":  "GPU-ef4844e9-7230-8d5f-08c8-08cc6f9f9d42"
+    }
+  ],
+  "cudaVersion":  "13.1",
+  "writerId":  "f16kqdshymyqajnnul0pegftw6sz39gz"
+}

@@ -1,0 +1,105 @@
+_wandb:
+    value:
+        cli_version: 0.25.0
+        e:
+            d04a1gp9z9nmewd5btaf6b1740965bxq:
+                codePath: train/base_train.py
+                codePathLocal: train/base_train.py
+                cpu_count: 16
+                cpu_count_logical: 24
+                cudaVersion: "13.1"
+                disk:
+                    /:
+                        total: "1967317549056"
+                        used: "424105529344"
+                email: davidjayfsu@gmail.com
+                executable: /home/orl1/Repos/WaLTRL/env/bin/python
+                git:
+                    commit: c2e63906a21e70694bc055e5161587dc9c261bdf
+                    remote: git@github.com:dmj17b/WaLTRL.git
+                gpu: NVIDIA GeForce RTX 4070 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ada
+                      cudaCores: 7680
+                      memoryTotal: "12878610432"
+                      name: NVIDIA GeForce RTX 4070 Ti
+                      uuid: GPU-ef4844e9-7230-8d5f-08c8-08cc6f9f9d42
+                host: orl1-US-Desktop-Aegis-RS
+                memory:
+                    total: "33475174400"
+                os: Linux-6.8.0-124-generic-x86_64-with-glibc2.39
+                program: /home/orl1/Repos/WaLTRL/train/base_train.py
+                python: CPython 3.12.3
+                root: /home/orl1/Repos/WaLTRL
+                startedAt: "2026-06-30T16:02:11.891326Z"
+                writerId: d04a1gp9z9nmewd5btaf6b1740965bxq
+        m: []
+        python_version: 3.12.3
+        t:
+            "1":
+                - 12
+                - 45
+            "2":
+                - 12
+                - 45
+            "3":
+                - 16
+            "4": 3.12.3
+            "5": 0.25.0
+            "12": 0.25.0
+            "13": linux-x86_64
+command_config:
+    value:
+        max_ang_vel: 0.5
+        max_cmd_duration: 3
+        max_lin_vel: 1.5
+        min_cmd_duration: 1.5
+        zero_ang_prob: 0.1
+        zero_lin_prob: 0.1
+env_config:
+    value: |
+        action_repeat: 1
+        ctrl_dt: 0.02
+        episode_length: 1000
+        impl: warp
+        naconmax: 24576
+        njmax: 90112
+        sim_dt: 0.004
+notes:
+    value: First training testing
+ppo_params:
+    value:
+        action_repeat: 1
+        batch_size: 256
+        deterministic_eval: true
+        discounting: 0.995
+        entropy_cost: 0.01
+        episode_length: 1000
+        learning_rate: 0.0003
+        normalize_observations: true
+        num_envs: 256
+        num_evals: 20
+        num_minibatches: 32
+        num_timesteps: 10000000
+        num_updates_per_batch: 4
+        reward_scaling: 1
+        unroll_length: 64
+resume_path:
+    value: null
+reward_config:
+    value:
+        action_smoothing: 1
+        ang_vel_tracking: 10
+        body_pitch_vel: 1
+        body_roll_vel: 1
+        body_z_vel: 1
+        flipped: 1000
+        height_penalty: 1
+        joint_vel: 10
+        lin_vel_tracking: 10
+        low_torques: 0.0001
+        orientation: 1
+        success_bonus: 1000
+save_path:
+    value: policies/test1

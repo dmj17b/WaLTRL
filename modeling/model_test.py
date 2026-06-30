@@ -16,7 +16,7 @@ motor_config = 'modeling/model_configs/2_7_Scale/motor_config.yaml'
 model_spec = GenModel.GenModel(model_config, motor_config)  # Create an instance of the model generator
 model_spec.add_scene()  # Add the scene to the model
 model_spec.add_groundplane()  # Add a ground plane to the model
-
+model_spec.add_contact_pairs()  # Add contact pairs to the model
 m = model_spec.spec.compile()
 d = mujoco.MjData(m)
 
@@ -29,7 +29,8 @@ def deadzone(value, threshold=0.1):
     if abs(value) < threshold:
         return 0.0
     return value
-
+max_contacts = 0
+max_constraints = 0
 # Launch standard MuJoCo viewer
 with mujoco.viewer.launch_passive(m, d) as viewer:
     while viewer.is_running():
@@ -45,7 +46,10 @@ with mujoco.viewer.launch_passive(m, d) as viewer:
         pygame.event.pump()  # Process event queue to update joystick state
 
 
-
+        max_contacts = max(max_contacts, d.ncon)  # Ensure at least one contact is allocated
+        max_constraints = max(max_constraints, d.nefc)
+        print(f"Max contacts: {max_contacts}")
+        print(f"Max constraints: {max_constraints}")
 
         # Rudimentary time keeping, will drift relative to wall clock.
         time_until_next_step = (m.opt.timestep - (time.time() - start_time))

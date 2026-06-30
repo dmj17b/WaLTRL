@@ -67,6 +67,10 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Noise config:
         self.noise_config = NoiseConfig()  # Initialize noise configuration with default values
+
+        # Velocity command parameters:
+        self.min_steps_per_command = int(self.command_config.min_cmd_duration / self.config.ctrl_dt)  # Minimum number of steps before changing command 
+        self.max_steps_per_command = int(self.command_config.max_cmd_duration / self.config.ctrl_dt)  # Maximum number of steps before changing command
     
     def reset(self, rng: jax.Array) -> mjx_env.State:
         '''Reset the environment to an initial state.'''
@@ -108,15 +112,16 @@ class BaseEnv(mjx_env.MjxEnv):
         metrics = {
             "reward/lin_vel_tracking": 0.0,
             "reward/ang_vel_tracking": 0.0,
-            "penalty/action_smoothness": 0.0,
+            "penalty/action_smoothing": 0.0,
             "penalty/torques": 0.0,
             "penalty/pitchover_failure": 0.0,
-            "penalty/pitch_angle_deviation": 0.0,
-            "penalty/pitch_angle_velocity": 0.0,
+            "penalty/orientation": 0.0,
             "penalty/rollover_failure": 0.0,
-            "penalty/roll_angle_deviation": 0.0,
-            "penalty/roll_angle_velocity": 0.0,
             "penalty/body_z_velocity": 0.0,
+            "penalty/flipped": 0.0,
+            "penalty/roll_velocity": 0.0,
+            "penalty/pitch_velocity": 0.0,
+            "penalty/z_velocity": 0.0,
             "train/episode_reward": 0.0,
         }
 
@@ -174,11 +179,13 @@ class BaseEnv(mjx_env.MjxEnv):
 
         data = self._simulation_step(state, action, self.n_substeps)
 
-        obs = self._get_policy_obs(data, state.info)
+        obs, info = self._get_policy_obs(data, state.info)
         reward = self._get_reward(data, action, state.info, state.metrics)
         done = jp.zeros(())  # Placeholder for episode termination condition
         metrics = state.metrics
-        info = state.info
+        info = self._maybe_update_cmd(info)
+        
+        info["prev_action"] = action
 
         # Check for rollover/pitchover failure based on the body up vector:
         upvec = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs + self.body_upvec_dim]
@@ -194,18 +201,46 @@ class BaseEnv(mjx_env.MjxEnv):
                     metrics: Dict[str, Any]) -> jax.Array:
         '''Basic reward function. This will likely be overwritten for most other environments, but common reward components can be implemented here.'''
         # Tracking rewards:
-        lin_vel_tracking_reward = self.tracking_reward(info["command"][0], data.sensordata[self.body_lin_vel_adrs])  # Calculate linear velocity tracking reward based on the current command and the body linear velocity from the sensor data
-        ang_vel_tracking_reward = self.tracking_reward(info["command"][1], data.qvel[self.torso_qveladr+5])  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
+        lin_vel_tracking_reward = self.reward_config.lin_vel_tracking * self.tracking_reward(info["command"][0], data.sensordata[self.body_lin_vel_adrs])  # Calculate linear velocity tracking reward based on the current command and the body linear velocity from the sensor data
+        ang_vel_tracking_reward = self.reward_config.ang_vel_tracking * self.tracking_reward(info["command"][1], data.qvel[self.torso_qveladr+5])  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
 
         # Orientation Penalty:
         up_vector = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs+self.body_upvec_dim]  # Extract the body up vector from the sensor data
-        orientation_penalty = jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))  # Calculate the squared distance of the up vector from the ideal up vector (0, 0, 1) for orientation penalty
+        orientation_penalty = self.reward_config.orientation * jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))  # Calculate the squared distance of the up vector from the ideal up vector (0, 0, 1) for orientation penalty
+
+        # Roll and Pitch Velocity Penalties:
+        roll_vel = data.qvel[self.torso_qveladr+3]  # Extract the roll velocity from the body angular velocity
+        pitch_vel = data.qvel[self.torso_qveladr+4]  # Extract the pitch velocity from the body angular velocity
+        roll_penalty = self.reward_config.body_roll_vel * jp.square(roll_vel)  # Calculate the squared roll velocity for penalty
+        pitch_penalty = self.reward_config.body_pitch_vel * jp.square(pitch_vel)  # Calculate the squared pitch velocity for penalty
+
+        # Z Velocity Penalty:
+        body_z_vel = data.sensordata[self.body_lin_vel_adrs+2]  # Extract the body Z velocity from the sensor data
+        body_z_vel_penalty = self.reward_config.body_z_vel * jp.square(body_z_vel)  # Calculate the squared body Z velocity for penalty
+
+        # Torque Penalty:
+        torque_penalty = self.reward_config.low_torques * jp.sum(jp.square(data.qfrc_actuator[self.act_ids]))
+
+        # Rollover and Pitchover Penalties:
+        flipped = jp.where(up_vector[2] < 0.0, 1.0, 0.0)  # Check if the up vector's Z component is less than 0 (indicating a fallover)
+        flip_penalty = flipped*self.reward_config.flipped  # Apply a penalty for falling over
+
+        # Action smoothing penalty:
+        action_smoothing_penalty = self.reward_config.action_smoothing * jp.sum(jp.square(action - info["prev_action"]))  # Calculate the squared difference between the current action and the previous action for smoothing penalty
+
+        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty  # Calculate the total episode reward by summing rewards and subtracting penalties
 
 
         metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
         metrics["reward/ang_vel_tracking"] = ang_vel_tracking_reward  # Log the angular velocity tracking reward in the metrics dictionary
-
-        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward  # Calculate the total episode reward as the sum of the linear and angular velocity tracking rewards
+        metrics["penalty/orientation"] = orientation_penalty  # Log the orientation penalty in the metrics dictionary
+        metrics["penalty/roll_velocity"] = roll_penalty  # Log the roll velocity penalty in the metrics dictionary
+        metrics["penalty/pitch_velocity"] = pitch_penalty  # Log the pitch velocity penalty in the metrics dictionary
+        metrics["penalty/z_velocity"] = body_z_vel_penalty  # Log the Z velocity penalty in the metrics dictionary
+        metrics["penalty/torques"] = torque_penalty  # Log the torque penalty in the metrics dictionary
+        metrics["penalty/flipped"] = flip_penalty  # Log the fallover penalty in the metrics dictionary
+        metrics["penalty/action_smoothing"] = action_smoothing_penalty  # Log the action smoothing penalty in the metrics dictionary
+        metrics["train/episode_reward"] = episode_reward  # Accumulate the episode reward in the metrics dictionary
 
         return episode_reward
 
@@ -261,7 +296,7 @@ class BaseEnv(mjx_env.MjxEnv):
         body_gyro = data.sensordata[self.body_gyro_adrs:self.body_gyro_adrs+self.body_gyro_dim] + gyro_noise  # Add noise to the body gyroscope readings for observation
 
         # Hip Joint Positions and Velocities:
-        hip_pos_rng, rng = jax.random.split(info["rng"])
+        hip_pos_rng, rng = jax.random.split(rng)
         hip_pos_noise = jax.random.normal(hip_pos_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for hip joint positions based on the specified standard deviation in the noise configuration
         hip_joint_positions = data.qpos[self.hip_qposadrs] + hip_pos_noise  # Add noise to the hip joint positions for observation
 
@@ -294,7 +329,9 @@ class BaseEnv(mjx_env.MjxEnv):
             joint_velocities,
             joint_torques
             ])
-        return obs
+        
+        info["rng"] = rng  # Update the RNG in the info dictionary for the next step
+        return obs, info
     
     def _get_value_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract value network observation from the simulation state'''

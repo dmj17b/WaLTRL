@@ -102,7 +102,6 @@ def main():
                 )
             )
 
-            print(f"QPos: {state.data.qpos[2]}")
 
             # Substitute joystick actions for testing:
             action = build_action()
@@ -117,13 +116,10 @@ def main():
                 key, subkey = jax.random.split(key)
                 state = reset_fn(subkey)  # Reset the environment after 2000 steps for testing purposes
                 n_steps = 0
-            state = step_fn(state, action)  # Step the environment
 
-            vel_data = state.data.sensordata[env.body_lin_vel_adrs:env.body_lin_vel_adrs+env.body_lin_vel_dim]  # Extract linear velocity data from the state
-            # print(f"angular velocity: {state.data.qvel[env.torso_qveladr+5]:.3f}, linear velocity: {vel_data[0]:.3f}, reward: {state.reward:.3f}")  # Print the current angular velocity, linear velocity, and reward for debugging purposes
-            up_vector = state.data.sensordata[env.body_upvec_adrs:env.body_upvec_adrs + env.body_upvec_dim]  # Extract the body up vector from the sensor data
-            print(f"Orientation penalty: {jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0]))):.3f}, UpVector Z: {up_vector[2]:.3f}")  # Print the orientation penalty and the Z component of the up vector for debugging purposes
-            # print(f"Up vector deviation: {jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))}, UpVector Z: {up_vector[2]}")  # Print the squared distance of the up vector from the ideal up vector for debugging purposes
+            state = step_fn(state, action)  # Step the environment
+            # print(f"Reward: {state.reward}, Command: {state.info['command']}, Done: {state.done}")
+
             # Update the standard CPU mj_data with the new MJX state
             mjx.get_data_into(mj_data, env.mj_model, state.data)
             n_steps += 1
