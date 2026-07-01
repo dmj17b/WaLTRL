@@ -8,15 +8,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 
 @flax.struct.dataclass
 class RewardConfig:
-    lin_vel_tracking: float = 10.0
-    ang_vel_tracking: float = 10.0
+    lin_vel_tracking: float = 100.0
+    ang_vel_tracking: float = 100.0
     body_pitch_vel: float = 1.0
     body_roll_vel: float = 1.0
-    orientation: float = 1.0
+    orientation: float = 0.5
     low_torques: float = 0.0001
-    body_z_vel: float = 1.0
-    height_penalty: float = 1.0
-    action_smoothing: float = 1.0
+    body_z_vel: float = 0.5
+    action_smoothing: float = 0.0001
     flipped: float = 1000.0
     joint_vel: float = 10.0
     success_bonus: float = 1000.0
@@ -24,12 +23,13 @@ class RewardConfig:
 
 @flax.struct.dataclass
 class CommandConfig:
-    max_lin_vel: float = 3.0
-    max_ang_vel: float = 1.5
-    min_cmd_duration: float = 1.5
-    max_cmd_duration: float = 3.0
+    max_lin_vel: float = 2.0
+    max_ang_vel: float = 1.0
+    min_cmd_duration: float = 5.0
+    max_cmd_duration: float = 12.0
     zero_lin_prob: float = 0.1
     zero_ang_prob: float = 0.1
+    zero_all_prob: float = 0.1
 
 
 @flax.struct.dataclass
@@ -48,6 +48,6 @@ def SimConfig() -> config_dict.ConfigDict:
         episode_length = 1000,
         action_repeat = 1,
         impl = 'warp',
-        naconmax = 256*12,
-        njmax = 256*44,
+        naconmax = 512*12,
+        njmax = 512*44,
     )

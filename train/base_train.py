@@ -1,5 +1,10 @@
 import os
 import sys
+os.environ['XLA_FLAGS'] = (
+    '--xla_gpu_triton_gemm_any=True '
+    '--xla_gpu_enable_latency_hiding_scheduler=true '
+    '--xla_gpu_enable_highest_priority_async_stream=true '
+)
 from wandb.util import np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Add parent directory to path
 import jax
@@ -19,15 +24,11 @@ import inspect
 from pathlib import Path
 import wandb
 from environment.BaseEnv import BaseEnv
-os.environ['XLA_FLAGS'] = (
-    '--xla_gpu_triton_gemm_any=True '
-    '--xla_gpu_enable_latency_hiding_scheduler=true '
-    '--xla_gpu_enable_highest_priority_async_stream=true '
-)
+
 
 def main():
     resume_path = None # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/test1"  # Path to save the new PPO model parameters after training
+    save_path = "policies/test4"  # Path to save the new PPO model parameters after training
 
     notes = "First training testing"
 
@@ -38,19 +39,19 @@ def main():
     env_cfg = env.config  # Retrieve the environment configuration
     ppo_params = {
         'action_repeat': 1,
-        'batch_size': 256,  
+        'batch_size': 512,  
         'discounting': 0.995,
         'entropy_cost': 0.01,
         'episode_length': env_cfg.episode_length,
         'learning_rate': 3e-4,
-        'num_envs': 256,
+        'num_envs': 512,
         'num_evals': 20,
         'num_minibatches': 32,
         'num_updates_per_batch': 4,
         'num_timesteps': 100_000_000,
         'normalize_observations': True,
         'reward_scaling': 1.0,
-        'unroll_length': 64,
+        'unroll_length': 32,
         'deterministic_eval': True,
         }
 
@@ -68,7 +69,7 @@ def main():
         "resume_path": resume_path,
         "save_path": save_path,
     }
-    
+
     run = wandb.init(project=project, config=wandb_config)
 
 

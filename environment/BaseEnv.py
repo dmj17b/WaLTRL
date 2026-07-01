@@ -114,10 +114,7 @@ class BaseEnv(mjx_env.MjxEnv):
             "reward/ang_vel_tracking": 0.0,
             "penalty/action_smoothing": 0.0,
             "penalty/torques": 0.0,
-            "penalty/pitchover_failure": 0.0,
             "penalty/orientation": 0.0,
-            "penalty/rollover_failure": 0.0,
-            "penalty/body_z_velocity": 0.0,
             "penalty/flipped": 0.0,
             "penalty/roll_velocity": 0.0,
             "penalty/pitch_velocity": 0.0,
@@ -179,11 +176,11 @@ class BaseEnv(mjx_env.MjxEnv):
 
         data = self._simulation_step(state, action, self.n_substeps)
 
-        obs, info = self._get_policy_obs(data, state.info)
-        reward = self._get_reward(data, action, state.info, state.metrics)
+        info = self._maybe_update_cmd(dict(state.info))
+        obs, info = self._get_policy_obs(data, info)
+        reward = self._get_reward(data, action, info, state.metrics)
         done = jp.zeros(())  # Placeholder for episode termination condition
         metrics = state.metrics
-        info = self._maybe_update_cmd(info)
         
         info["prev_action"] = action
 
@@ -278,6 +275,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def _get_policy_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract policy network observation from the simulation state'''
+        info = dict(info)
         
         # Forward and angular velocity commands
         vel_commands = info["command"]
@@ -340,16 +338,22 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def sample_command(self, rng: jax.Array) -> jax.Array:
         # Split RNG keys
-        rng, lin_vel_rng, ang_vel_rng, zero_rng = jax.random.split(rng, num=4)
+        rng, lin_vel_rng, ang_vel_rng, zero_rng, zero_lin_rng, zero_ang_rng = jax.random.split(rng, num=6)
         # Determine whether to sample a zero command based on the specified probability
-        is_zero_command = jax.random.uniform(zero_rng) < self.command_config.zero_lin_prob
+        is_zero_lin_command = jax.random.uniform(zero_lin_rng) < self.command_config.zero_lin_prob
+        is_zero_ang_command = jax.random.uniform(zero_ang_rng) < self.command_config.zero_ang_prob
+        is_all_zero_command = jax.random.uniform(zero_rng) < self.command_config.zero_all_prob
 
         # Sample linear and angular velocity commands uniformly within the specified ranges
         lin_vel_command = jax.random.uniform(lin_vel_rng, minval=-self.command_config.max_lin_vel, maxval=self.command_config.max_lin_vel)
         ang_vel_command = jax.random.uniform(ang_vel_rng, minval=-self.command_config.max_ang_vel, maxval=self.command_config.max_ang_vel)
 
-        lin_vel_command = jp.where(is_zero_command, 0.0, lin_vel_command)
-        ang_vel_command = jp.where(is_zero_command, 0.0, ang_vel_command)
+        # If the sampled command is determined to be zero, set the corresponding command to zero
+        # Either linear, angular, neither, or both can be set to zero based on configured probabilities
+        lin_vel_command = jp.where(is_zero_lin_command, 0.0, lin_vel_command)
+        ang_vel_command = jp.where(is_zero_ang_command, 0.0, ang_vel_command)
+        lin_vel_command = jp.where(is_all_zero_command, 0.0, lin_vel_command)
+        ang_vel_command = jp.where(is_all_zero_command, 0.0, ang_vel_command)
         command = jp.array([lin_vel_command, ang_vel_command])
         return command
     
