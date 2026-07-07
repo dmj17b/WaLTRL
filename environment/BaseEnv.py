@@ -173,11 +173,12 @@ class BaseEnv(mjx_env.MjxEnv):
     # MAIN STEP FUNCTION
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         '''Apply the given action to the environment and step the simulation forward.'''
-
+        info = self._maybe_update_cmd(dict(state.info))
         data = self._simulation_step(state, action, self.n_substeps)
 
-        info = self._maybe_update_cmd(dict(state.info))
         obs, info = self._get_policy_obs(data, info)
+
+
         reward = self._get_reward(data, action, info, state.metrics)
         done = jp.zeros(())  # Placeholder for episode termination condition
         metrics = state.metrics

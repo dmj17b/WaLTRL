@@ -15,7 +15,7 @@ class RewardConfig:
     orientation: float = 0.5
     low_torques: float = 0.0001
     body_z_vel: float = 0.5
-    action_smoothing: float = 0.0001
+    action_smoothing: float = 0.01
     flipped: float = 1000.0
     joint_vel: float = 10.0
     success_bonus: float = 1000.0
@@ -25,8 +25,8 @@ class RewardConfig:
 class CommandConfig:
     max_lin_vel: float = 2.0
     max_ang_vel: float = 1.0
-    min_cmd_duration: float = 5.0
-    max_cmd_duration: float = 12.0
+    min_cmd_duration: float = 2.5
+    max_cmd_duration: float = 5.5
     zero_lin_prob: float = 0.1
     zero_ang_prob: float = 0.1
     zero_all_prob: float = 0.1
@@ -34,9 +34,9 @@ class CommandConfig:
 
 @flax.struct.dataclass
 class NoiseConfig:
-    joint_pos_std: float = 0.01
+    joint_pos_std: float = 0.001
     joint_vel_std: float = 0.1
-    torque_std: float = 0.01
+    torque_std: float = 0.1
     body_accel_std: float = 0.01
     body_gyro_std: float = 0.01
 

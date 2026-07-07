@@ -5,13 +5,14 @@
 - [ ] Base Pos Reset
 - [ ] Joint Vel Reset
 - [x] Action space mapping
-- [ ] Policy Observation getter
+- [x] Policy Observation getter
   - [ ] Observation noise
 - [ ] Value Observation getter
-- [ ] Motor Target Calculations
+- [x] Motor Target Calculations
 - [ ] Motor Models
-- [ ] Define contact pairs for wheels
-
+- [x] Define contact pairs for wheels
+- [x] Define contact pairs for body
+- [x] Define contact pairs for shins
 # Questions to answer/things to figure out
 - [x] Where should I add in armature?
   - Just put everything into the actuator

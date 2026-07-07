@@ -1,57 +1,39 @@
 import os
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Add parent directory to path
-# os.environ["JAX_PLATFORMS"] = "cpu"  # Force JAX to use CPU for this test
-import mujoco
-import mujoco.viewer
-from typing import Optional, Dict, Union
-from mujoco import mjx
-import numpy as np
 import time
+from pathlib import Path
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import jax
 import jax.numpy as jp
+import mujoco
+import mujoco.viewer
 from brax.io import model
 from brax.training.agents.ppo import networks as ppo_networks
-from brax.training.agents.ppo import networks_vision as ppo_networks_vision
-from brax.training.agents.ppo import train as ppo
 from brax.training.acme import running_statistics
-from pygame import joystick
-import pygame
-import environment.BaseEnv as BaseEnv
+from mujoco import mjx
+from mujoco_playground import wrapper
 
-print(jax.devices())
+from environment.BaseEnv import BaseEnv
+
 
 def main():
-    model_path = "policies/test3"  # Path to the saved PPO model parameters
+    model_path = Path("policies/test3")
+    if not model_path.exists():
+        raise FileNotFoundError(f"Missing PPO checkpoint directory: {model_path}")
 
-    # Initialize joystick
-    joystick.init()
-    js = joystick.Joystick(0)  # Initialize the first joystick
-    js.init()
-    pygame.init()
-    
+    env = BaseEnv()
+    env = wrapper.wrap_for_brax_training(
+        env,
+        episode_length=env.config.episode_length,
+        action_repeat=env.config.action_repeat,
+    )
 
-    # Initialize the environment
-    env = BaseEnv.BaseEnv()  # Create an instance of the BaseEnv environment
-    key = jax.random.PRNGKey(2)  # Initialize a random key for JAX
-
-    # JIT compile the reset and step functions
     reset_fn = jax.jit(env.reset)
     step_fn = jax.jit(env.step)
 
-    # Reset the environment to get initial state
-    key, subkey = jax.random.split(key)
-    state = reset_fn(subkey)
-
-    # Create standard CPU mj_data
-    mj_data = mujoco.MjData(env._mj_model)
-
-    # Pull the initial MJX state into standard CPU mj_data
-    mjx.get_data_into(mj_data, env.mj_model, state.data)
-    dt = env._mj_model.opt.timestep  # Get the simulation timestep
-    
-    # Load the PPO model:
-    params = model.load_params(model_path)
+    params = model.load_params(str(model_path))
     inference_fn = ppo_networks.make_inference_fn(
         ppo_networks.make_ppo_networks(
             observation_size=env.observation_size,
@@ -59,62 +41,49 @@ def main():
             preprocess_observations_fn=running_statistics.normalize,
         )
     )(params, deterministic=True)
+    policy_fn = jax.jit(inference_fn)
 
-    jit_inference_fn = jax.jit(inference_fn)
+    rng = jax.random.PRNGKey(2)
+    rng, reset_rng = jax.random.split(rng)
+    state = reset_fn(reset_rng[None])
 
+    mj_data = mujoco.MjData(env.mj_model)
+    mjx.get_data_into([mj_data], env.mj_model, state.data)
 
-    # Launch standard MuJoCo viewer
-    n_steps = 0
+    dt = env.mj_model.opt.timestep
+    previous_done = False
+
     with mujoco.viewer.launch_passive(env.mj_model, mj_data) as viewer:
         while viewer.is_running():
-            # Keep track of step time
             start_time = time.time()
-            # Update the standard CPU mj_data with the new MJX state
-            mjx.get_data_into(mj_data, env.mj_model, state.data)
 
-            viewer.sync()  # Sync the viewer to update the visualization
+            if bool(state.done[0]):
+                if not previous_done:
+                    print(f"episode finished at wrapped step {int(state.info['steps'][0])}")
+                previous_done = True
+            else:
+                previous_done = False
 
-            # Get velocity command from joystick input (for testing purposes)
-            pygame.event.pump()  # Process event queue to update joystick state
-            
-            reset_button = js.get_button(0)
-            if reset_button:
-                key, subkey = jax.random.split(key)
-                state = reset_fn(subkey)  # Reset the environment if the reset button is pressed
+            action, extras = policy_fn(state.obs, rng)
+            del extras
 
-            velocity_command = jp.array([
-                -js.get_axis(1)*env.command_config.max_lin_vel,  # Linear velocity command from joystick axis 0
-                -js.get_axis(0)*env.command_config.max_ang_vel,  # Linear velocity command from joystick axis 1
-            ])
-            info = dict(state.info)
-            info['command'] = jp.asarray(velocity_command)
-            state = state.replace(info=info)  # Update the state info with the new command
+            state = step_fn(state, action)
 
+            mjx.get_data_into([mj_data], env.mj_model, state.data)
+            viewer.sync()
 
-            # Update the MJX state with any changes from viewer interactions (e.g., user dragging the model)
-            state = state.replace(
-                data=state.data.replace(
-                    qpos=jp.array(mj_data.qpos),
-                    qvel=jp.array(mj_data.qvel),
-                    qfrc_applied=jp.array(mj_data.qfrc_applied),
-                    xfrc_applied=jp.array(mj_data.xfrc_applied),
-                    ctrl=jp.array(mj_data.ctrl),
-                )
+            command = jp.asarray(state.info["command"][0])
+            reward = float(state.reward[0])
+            done = bool(state.done[0])
+            print(
+                f"step={int(state.info['steps'][0])} command={command.tolist()} "
+                f"reward={reward:.3f} done={done}"
             )
-        
 
-            # Sample a random action (for testing purposes) every 5 sim steps:
-            if n_steps % 5 == 0:
-                action = jit_inference_fn(state.obs, key)  # Get action from the PPO policy
-
-
-            state = step_fn(state, action[0])  # Step the environment
-            n_steps += 1
-
-            elapsed = time.time()-start_time
+            elapsed = time.time() - start_time
             if elapsed < dt:
-                time.sleep(dt - elapsed)  # Sleep to maintain real-time simulation
-            
+                time.sleep(dt - elapsed)
+
 
 if __name__ == "__main__":
     main()
