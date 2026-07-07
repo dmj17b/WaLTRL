@@ -552,11 +552,12 @@ class GenModel():
                 geomname2 = 'floor',
             )
         # Shin - Floor Contact Pairs:
-        for shin_name in shin_names:
-            self.spec.add_pair(
-                geomname1 = shin_name,
-                geomname2 = 'floor',
-            )
+        # for shin_name in shin_names:
+        #     self.spec.add_pair(
+        #         geomname1 = shin_name,
+        #         geomname2 = 'floor',
+        #     )
+        
         # Wheel-Wheel Contact Pairs:
         for i in range(len(wheel_names)):
             if 'left' in wheel_names[i] and 'torso' in wheel_names[i]:
