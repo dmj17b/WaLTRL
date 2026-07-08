@@ -22,7 +22,7 @@ import environment.BaseEnv as BaseEnv
 print(jax.devices())
 
 def main():
-    model_path = "policies/test4"  # Path to the saved PPO model parameters
+    model_path = "policies/test5"  # Path to the saved PPO model parameters
 
     # Initialize joystick
     joystick.init()

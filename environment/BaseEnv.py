@@ -6,6 +6,7 @@ import warnings  # Import warnings module (not used in this snippet).
 
 import jax  # Import JAX for numerical computing and random number generation.
 import jax.numpy as jp  # Import JAX's numpy as jp for array operations.
+import numpy as np
 from ml_collections import config_dict  # Import config_dict for configuration management.
 import mujoco  # Import mujoco for physics simulation.
 from mujoco import mjx 
@@ -13,7 +14,6 @@ from mujoco import mjx
 from mujoco_playground._src import mjx_env  # Import custom environment base class.
 from mujoco_playground._src import reward  # Import reward utilities (not used in this snippet).
 from mujoco_playground._src.dm_control_suite import common  # Import common utilities for dm_control_suite.
-import mujoco_warp as mjw
 
 from modeling import GenModel
 import yaml
@@ -44,15 +44,8 @@ class BaseEnv(mjx_env.MjxEnv):
         self.model_spec.add_scene()
         self._add_terrain()
         self._mj_model = self.model_spec.spec.compile()
-        # self._mjw_model = mjw.put_model(self._mj_model)
-        # self._mjw_model = mjw.put_model(m = self._mj_model, impl=self._config.impl)
         self._mjx_model = mjx.put_model(m = self._mj_model, impl=self._config.impl)
 
-        # Select the appropriate model based on the implementation specified in the configuration
-        if(self._config.impl == 'warp'):
-            self.model = self._mj_model
-        else:
-            self.model = self._mjx_model
 
         # Define addresses for joints and actuators for easy access later
         self._define_addresses()
@@ -88,7 +81,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Create new data object:
         data = mjx_env.make_data(
-            self.model,
+            self._mj_model,
             qpos = qpos,
             qvel = qvel,
             mocap_pos = mocap_pos,
@@ -157,10 +150,10 @@ class BaseEnv(mjx_env.MjxEnv):
 
         def _substep(carry: mjx.Data, unused_t) -> Tuple[mjx.Data, None]:
             # Apply PD Control laws
-            hip_torques = self.hip_controller(state, hip_actions, state.info["rng"])
-            knee_torques = self.knee_controller(state, knee_actions, state.info["rng"])
-            wheel_torques = self.wheel_controller(state, wheel_actions, state.info["rng"])
-            
+            hip_torques = self.hip_controller(carry, hip_actions, state.info["rng"])
+            knee_torques = self.knee_controller(carry, knee_actions, state.info["rng"])
+            wheel_torques = self.wheel_controller(carry, wheel_actions, state.info["rng"])
+
             # Combine torques into a single vector for all actuators:
             torques = jp.zeros(self.mj_model.nu)
             torques = torques.at[self.hip_act_ids].set(hip_torques)
@@ -250,27 +243,27 @@ class BaseEnv(mjx_env.MjxEnv):
         reward = jp.exp(-0.5 * (error / sigma) ** 2)
         return reward
 
-    def hip_controller(self, state: mjx_env.State, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
+    def hip_controller(self, data: mjx.Data, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
         '''Calculate the control signals for the hip motors based on the current state, action, and command.'''
         hip_targets = self.hip_action_scale*hip_actions
-        des_torques = self.hip_motor_params["Kp"] * (hip_targets - state.data.qpos[self.hip_qposadrs]) + self.hip_motor_params["Kd"] * (0 - state.data.qvel[self.hip_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
-        actual_torques = self.motor_model(des_torques, state.data.qvel[self.hip_qveladrs], self.hip_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-        return des_torques
+        des_torques = self.hip_motor_params["Kp"] * (hip_targets - data.qpos[self.hip_qposadrs]) + self.hip_motor_params["Kd"] * (0 - data.qvel[self.hip_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
+        actual_torques = self.motor_model(des_torques, data.qvel[self.hip_qveladrs], self.hip_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return actual_torques
 
-    def knee_controller(self, state: mjx_env.State, knee_actions: jax.Array, rng: jax.Array) -> jax.Array:
+    def knee_controller(self, data: mjx.Data, knee_actions: jax.Array, rng: jax.Array) -> jax.Array:
         '''Calculate the control signals for the knee motors based on the current state, action, and command.'''
-        knee_targets = state.data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
-        des_torques = self.knee_motor_params["Kp"] * (knee_targets - state.data.qpos[self.knee_qposadrs]) + self.knee_motor_params["Kd"] * (0 - state.data.qvel[self.knee_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
-        actual_torques = self.motor_model(des_torques, state.data.qvel[self.knee_qveladrs], self.knee_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-        return des_torques
+        knee_targets = data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
+        des_torques = self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs]) + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
+        actual_torques = self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return actual_torques
 
-    def wheel_controller(self, state: mjx_env.State, wheel_actions: jax.Array, rng: jax.Array) -> jax.Array:
+    def wheel_controller(self, data: mjx.Data, wheel_actions: jax.Array, rng: jax.Array) -> jax.Array:
         '''Calculate the control signals for the wheel motors based on the current state, action, and command.'''
         wheel_targets = self.wheel_action_scale*wheel_actions  # Calculate target wheel velocities by scaling the actions
-        des_torques = self.wheel_motor_params["Kd"] * (wheel_targets - state.data.qvel[self.wheel_qveladrs])  # Velocity control law to calculate desired torques based on velocity error
-        actual_torques = self.motor_model(des_torques, state.data.qvel[self.wheel_qveladrs], self.wheel_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-        return des_torques
-    
+        des_torques = self.wheel_motor_params["Kd"] * (wheel_targets - data.qvel[self.wheel_qveladrs])  # Velocity control law to calculate desired torques based on velocity error
+        actual_torques = self.motor_model(des_torques, data.qvel[self.wheel_qveladrs], self.wheel_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return actual_torques
+
     def motor_model(self, des_torques: jax.Array, curr_vel: jax.Array, motor_params: dict) -> jax.Array:
         '''NOT IMPLEMENTED: Placeholder to restrict desired torques based on motor speed-torque curves.'''
         return des_torques  # Placeholder for motor model implementation that limits torques based on speed-torque curves
@@ -280,7 +273,7 @@ class BaseEnv(mjx_env.MjxEnv):
     def _get_policy_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract policy network observation from the simulation state'''
         info = dict(info)
-        
+        rng, accel_rng, gyro_rng, hip_rng, knee_rng, joint_vel_rng, torque_rng = jax.random.split(info["rng"], num=7)
         # Forward and angular velocity commands
         vel_commands = info["command"]
 
@@ -288,34 +281,28 @@ class BaseEnv(mjx_env.MjxEnv):
         prev_action = info["prev_action"]
 
         # Body accelerometer and gyroscope readings:
-        accel_rng, rng = jax.random.split(info["rng"])
         accel_noise = jax.random.normal(accel_rng, shape=(self.body_accel_dim,)) * self.noise_config.body_accel_std  # Generate noise for body accelerometer and gyroscope readings based on the specified standard deviation in the noise configuration
         body_accel = data.sensordata[self.body_accel_adrs:self.body_accel_adrs+self.body_accel_dim] + accel_noise  # Add noise to the body accelerometer and gyroscope readings for observation
 
         # Body gyroscope readings:
-        gyro_rng, rng = jax.random.split(rng)
         gyro_noise = jax.random.normal(gyro_rng, shape=(self.body_gyro_dim,)) * self.noise_config.body_gyro_std  # Generate noise for body gyroscope readings based on the specified standard deviation in the noise configuration
         body_gyro = data.sensordata[self.body_gyro_adrs:self.body_gyro_adrs+self.body_gyro_dim] + gyro_noise  # Add noise to the body gyroscope readings for observation
 
         # Hip Joint Positions and Velocities:
-        hip_pos_rng, rng = jax.random.split(rng)
-        hip_pos_noise = jax.random.normal(hip_pos_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for hip joint positions based on the specified standard deviation in the noise configuration
+        hip_pos_noise = jax.random.normal(hip_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for hip joint positions based on the specified standard deviation in the noise configuration
         hip_joint_positions = data.qpos[self.hip_qposadrs] + hip_pos_noise  # Add noise to the hip joint positions for observation
 
         # Knee Joint Positions:
-        knee_pos_rng, rng = jax.random.split(rng)
-        knee_pos_noise = jax.random.normal(knee_pos_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for knee joint positions based on the specified standard deviation in the noise configuration
+        knee_pos_noise = jax.random.normal(knee_rng, shape=(4,)) * self.noise_config.joint_pos_std  # Generate noise for knee joint positions based on the specified standard deviation in the noise configuration
         knee_joint_positions = data.qpos[self.knee_qposadrs] + knee_pos_noise  # Add noise to the knee joint positions for observation
         knee_pos_sins = jp.sin(knee_joint_positions)
         knee_pos_coss = jp.cos(knee_joint_positions)
         
         # Joint Velocities"
-        joint_vel_rng, rng = jax.random.split(rng)
         joint_vel_noise = jax.random.normal(joint_vel_rng, shape=(self.mj_model.nu,)) * self.noise_config.joint_vel_std  # Generate noise for joint velocities based on the specified standard deviation in the noise configuration
         joint_velocities = data.qvel[self.qvel_adrs] + joint_vel_noise  # Add noise to the joint velocities for observation
 
         # Torque noise:
-        torque_rng, rng = jax.random.split(rng)
         torque_noise = jax.random.normal(torque_rng, shape=(self.mj_model.nu,)) * self.noise_config.torque_std  # Generate noise for torques based on the specified standard deviation in the noise configuration
         joint_torques = data.qfrc_actuator[self.act_ids] + torque_noise  # Add noise to the joint torques for observation
 
@@ -438,9 +425,9 @@ class BaseEnv(mjx_env.MjxEnv):
 
     def _define_addresses(self):
         '''Define convenient references to joint IDs and qpos addresses for easy access later.'''
-        self.hip_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_hip", "fr_hip", "bl_hip", "br_hip"]])
-        self.knee_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_knee", "fr_knee", "bl_knee", "br_knee"]])
-        self.wheel_act_ids = jp.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in [
+        self.hip_act_ids = np.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_hip", "fr_hip", "bl_hip", "br_hip"]])
+        self.knee_act_ids = np.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in ["fl_knee", "fr_knee", "bl_knee", "br_knee"]])
+        self.wheel_act_ids = np.array([mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, name) for name in [
             "fl_wheel1", "fl_wheel2", "fr_wheel1", "fr_wheel2",
             "bl_wheel1", "bl_wheel2", "br_wheel1", "br_wheel2"
         ]])  
@@ -461,7 +448,7 @@ class BaseEnv(mjx_env.MjxEnv):
         self.br_wheel1_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "br_wheel1")
         self.br_wheel2_act_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_ACTUATOR, "br_wheel2")
 
-        self.act_ids = jp.concatenate([self.hip_act_ids, self.knee_act_ids, self.wheel_act_ids])  # Concatenate all actuator IDs for easy indexing
+        self.act_ids = np.concatenate([self.hip_act_ids, self.knee_act_ids, self.wheel_act_ids])  # Concatenate all actuator IDs for easy indexing
 
         hip_jids = self.mj_model.actuator_trnid[self.hip_act_ids, 0]  # Get the joint IDs for the hip actuators
         knee_jids = self.mj_model.actuator_trnid[self.knee_act_ids, 0]  # Get the joint IDs for the knee actuators
@@ -470,12 +457,12 @@ class BaseEnv(mjx_env.MjxEnv):
         self.hip_qposadrs = self.mj_model.jnt_qposadr[hip_jids]  # Get the qpos addresses for the hip joints
         self.knee_qposadrs = self.mj_model.jnt_qposadr[knee_jids]  # Get the qpos addresses for the knee joints
         self.wheel_qposadrs = self.mj_model.jnt_qposadr[wheel_jids]  # Get the qpos addresses for the wheel joints
-        self.qpos_adrs = jp.concatenate([self.hip_qposadrs, self.knee_qposadrs, self.wheel_qposadrs])  # Concatenate all qpos addresses for easy indexing
+        self.qpos_adrs = np.concatenate([self.hip_qposadrs, self.knee_qposadrs, self.wheel_qposadrs])  # Concatenate all qpos addresses for easy indexing
 
         self.hip_qveladrs = self.mj_model.jnt_dofadr[hip_jids]  # Get the qvel addresses for the hip joints
         self.knee_qveladrs = self.mj_model.jnt_dofadr[knee_jids]  # Get the qvel addresses for the knee joints
         self.wheel_qveladrs = self.mj_model.jnt_dofadr[wheel_jids]  # Get the qvel addresses for the wheel joints
-        self.qvel_adrs = jp.concatenate([self.hip_qveladrs, self.knee_qveladrs, self.wheel_qveladrs])  # Concatenate all qvel addresses for easy indexing
+        self.qvel_adrs = np.concatenate([self.hip_qveladrs, self.knee_qveladrs, self.wheel_qveladrs])  # Concatenate all qvel addresses for easy indexing
         
         # Torso and Head IDs:
         self.torso_body_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_BODY, "torso")  # Get the body ID for the torso

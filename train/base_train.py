@@ -28,9 +28,9 @@ from environment.BaseEnv import BaseEnv
 
 def main():
     resume_path = None # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/test4"  # Path to save the new PPO model parameters after training
+    save_path = "policies/test7"  # Path to save the new PPO model parameters after training
 
-    notes = "Changed policy and network sizes"
+    notes = "Switched to lower njmax"
 
     env = BaseEnv()  # Create an instance of the BaseEnv environment
 
@@ -111,8 +111,8 @@ def main():
         network_factory = functools.partial(
             ppo_networks.make_ppo_networks, 
             **ppo_params.network_factory,
-            policy_hidden_layer_sizes = [512, 256, 128],
-            value_hidden_layer_sizes = [512, 256, 128],
+            policy_hidden_layer_sizes = [512, 256, 256, 128],
+            value_hidden_layer_sizes = [512, 256, 256, 128],
         )
     
     train_fn = functools.partial(

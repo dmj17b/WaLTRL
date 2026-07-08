@@ -49,5 +49,5 @@ def SimConfig() -> config_dict.ConfigDict:
         action_repeat = 1,
         impl = 'warp',
         naconmax = 512*12,
-        njmax = 512*44,
+        njmax = 44,
     )
