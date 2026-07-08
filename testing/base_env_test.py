@@ -1,6 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# os.environ["JAX_PLATFORMS"] = "cpu"  # Force JAX to use CPU for this test
 import mujoco
 from mujoco import mjx
 import mujoco.viewer
@@ -105,6 +106,13 @@ def main():
 
             # Substitute joystick actions for testing:
             action = build_action()
+
+            # Print rotation matrix for torso:
+            # torso_rot = state.data.body("torso").xmat.reshape(3, 3)
+            rot = state.data.xmat[env.torso_body_id]
+            proj_grav = -rot[2,:]
+
+            print(f"Projected gravity: {proj_grav}")
 
             # Reset conditions:
             if state.done:

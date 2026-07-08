@@ -30,7 +30,7 @@ def main():
     resume_path = None # Path to the saved PPO model parameters to resume training from
     save_path = "policies/test4"  # Path to save the new PPO model parameters after training
 
-    notes = "First training testing"
+    notes = "Changed policy and network sizes"
 
     env = BaseEnv()  # Create an instance of the BaseEnv environment
 
@@ -110,7 +110,9 @@ def main():
         del ppo_training_params["network_factory"]  # Remove network factory from training params since it is not a valid argument for the PPO class
         network_factory = functools.partial(
             ppo_networks.make_ppo_networks, 
-            **ppo_params.network_factory
+            **ppo_params.network_factory,
+            policy_hidden_layer_sizes = [512, 256, 128],
+            value_hidden_layer_sizes = [512, 256, 128],
         )
     
     train_fn = functools.partial(

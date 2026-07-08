@@ -13,6 +13,7 @@ from mujoco import mjx
 from mujoco_playground._src import mjx_env  # Import custom environment base class.
 from mujoco_playground._src import reward  # Import reward utilities (not used in this snippet).
 from mujoco_playground._src.dm_control_suite import common  # Import common utilities for dm_control_suite.
+import mujoco_warp as mjw
 
 from modeling import GenModel
 import yaml
@@ -43,6 +44,8 @@ class BaseEnv(mjx_env.MjxEnv):
         self.model_spec.add_scene()
         self._add_terrain()
         self._mj_model = self.model_spec.spec.compile()
+        # self._mjw_model = mjw.put_model(self._mj_model)
+        # self._mjw_model = mjw.put_model(m = self._mj_model, impl=self._config.impl)
         self._mjx_model = mjx.put_model(m = self._mj_model, impl=self._config.impl)
 
         # Select the appropriate model based on the implementation specified in the configuration
@@ -332,9 +335,54 @@ class BaseEnv(mjx_env.MjxEnv):
         info["rng"] = rng  # Update the RNG in the info dictionary for the next step
         return obs, info
     
+
+    ### WORK IN PROGRESS ###
     def _get_value_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
         '''Extract value network observation from the simulation state'''
-        pass
+        info = dict(info)
+        
+        # Forward and angular velocity commands
+        vel_commands = info["command"]
+
+        # Previous action (for action smoothing penalty)
+        prev_action = info["prev_action"]
+
+        # Body accelerometer and gyroscope readings:
+        body_accel = data.sensordata[self.body_accel_adrs:self.body_accel_adrs+self.body_accel_dim] 
+        body_gyro = data.sensordata[self.body_gyro_adrs:self.body_gyro_adrs+self.body_gyro_dim]
+
+        # Projected gravity vector in the body frame:
+        torso_rot_mat = data.xmat
+        
+
+        # Hip Joint Positions and Velocities:
+        hip_joint_positions = data.qpos[self.hip_qposadrs]  
+
+        # Knee Joint Positions:
+        knee_joint_positions = data.qpos[self.knee_qposadrs]
+        knee_pos_sins = jp.sin(knee_joint_positions)
+        knee_pos_coss = jp.cos(knee_joint_positions)
+        
+        # Joint Velocities
+        joint_velocities = data.qvel[self.qvel_adrs] 
+
+        # Torque noise:
+        joint_torques = data.qfrc_actuator[self.act_ids]  # Add noise to the joint torques for observation
+
+        # Concatenate everything into observation vector:
+        obs = jp.concatenate([
+            vel_commands,
+            prev_action,
+            body_accel,
+            body_gyro,
+            hip_joint_positions,
+            knee_pos_sins,
+            knee_pos_coss,
+            joint_velocities,
+            joint_torques
+            ])
+        
+        return obs
 
 
     def sample_command(self, rng: jax.Array) -> jax.Array:
