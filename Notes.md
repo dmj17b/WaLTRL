@@ -7,12 +7,18 @@
 - [x] Action space mapping
 - [x] Policy Observation getter
   - [ ] Observation noise
+    - [ ] Double check noise levels on observation are not too high
 - [ ] Value Observation getter
+  - [ ] Add ground reaction forces?
+  - [ ] Add wheel contact mask?
+  - [ ] Add direct velocities?
+  - [ ] 
 - [x] Motor Target Calculations
 - [ ] Motor Models
 - [x] Define contact pairs for wheels
 - [x] Define contact pairs for body
 - [x] Define contact pairs for shins
+- [x] Double check that the flip-over condition is not overly generous (wasting time steps when all but guaranteed to flip)
 
 
 # Questions to answer/things to figure out
@@ -21,9 +27,4 @@
 - [x] How is armature calculated with joint vs actuator armature?
   - I_total = I_joint + (I_actuator*gear^2) 
 
-# Things to try for speed up
-- [ ] Try switching to mjw model?
-- [ ] Fix any discrepancies with mjw and other packages (update everything if necessary) 
 
-# Questions for Jacob:
-- What are some areas I can double check for speed/efficiency? What mistakes have you made that cause slowdowns?

@@ -123,7 +123,10 @@ class BaseEnv(mjx_env.MjxEnv):
 
 
         # Get initial observation:
-        obs, info = self._get_policy_obs(data, info)
+        policy_obs, info = self._get_policy_obs(data, info)
+        value_obs = self._get_value_obs(data, info)
+
+        obs = {"policy": policy_obs, "value": value_obs}
 
         return mjx_env.State(data, obs, reward, done, metrics, info)
 
@@ -172,8 +175,10 @@ class BaseEnv(mjx_env.MjxEnv):
         info = self._maybe_update_cmd(dict(state.info))
         data = self._simulation_step(state, action, self.n_substeps)
 
-        obs, info = self._get_policy_obs(data, info)
+        policy_obs, info = self._get_policy_obs(data, info)
+        value_obs = self._get_value_obs(data, info)
 
+        obs = {"policy": policy_obs, "value": value_obs}
 
         reward = self._get_reward(data, action, info, state.metrics)
         done = jp.zeros(())  # Placeholder for episode termination condition
@@ -183,7 +188,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Check for rollover/pitchover failure based on the body up vector:
         upvec = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs + self.body_upvec_dim]
-        done = jp.where(upvec[2] < -0.1, 1.0, done)  # Terminate episode if the up vector's Z component is less than -0.1 (indicating a fallover)
+        done = jp.where(upvec[2] < 0.1, 1.0, done)  # Terminate episode if the up vector's Z component is less than -0.1 (indicating a fallover)
 
         return mjx_env.State(data, obs, reward, done, metrics, info)
     
@@ -199,7 +204,8 @@ class BaseEnv(mjx_env.MjxEnv):
         ang_vel_tracking_reward = self.reward_config.ang_vel_tracking * self.tracking_reward(info["command"][1], data.qvel[self.torso_qveladr+5])  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
 
         # Orientation Penalty:
-        up_vector = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs+self.body_upvec_dim]  # Extract the body up vector from the sensor data
+        torso_rot_mat = data.xmat[self.torso_body_id]  # Extract the torso rotation matrix from the simulation data
+        up_vector = torso_rot_mat[:, 2]  # Extract the up vector from the torso rotation matrix
         orientation_penalty = self.reward_config.orientation * jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))  # Calculate the squared distance of the up vector from the ideal up vector (0, 0, 1) for orientation penalty
 
         # Roll and Pitch Velocity Penalties:
@@ -216,7 +222,7 @@ class BaseEnv(mjx_env.MjxEnv):
         torque_penalty = self.reward_config.low_torques * jp.sum(jp.square(data.qfrc_actuator[self.act_ids]))
 
         # Rollover and Pitchover Penalties:
-        flipped = jp.where(up_vector[2] < 0.0, 1.0, 0.0)  # Check if the up vector's Z component is less than 0 (indicating a fallover)
+        flipped = jp.where(up_vector[2] < 0.1, 1.0, 0.0)  # Check if the up vector's Z component is less than 0 (indicating a fallover)
         flip_penalty = flipped*self.reward_config.flipped  # Apply a penalty for falling over
 
         # Action smoothing penalty:
@@ -238,7 +244,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
         return episode_reward
 
-    def tracking_reward(self, desired, actual, sigma=0.25):
+    def tracking_reward(self, desired, actual, sigma=0.15):
         error = desired - actual
         reward = jp.exp(-0.5 * (error / sigma) ** 2)
         return reward
@@ -334,13 +340,19 @@ class BaseEnv(mjx_env.MjxEnv):
         # Previous action (for action smoothing penalty)
         prev_action = info["prev_action"]
 
-        # Body accelerometer and gyroscope readings:
-        body_accel = data.sensordata[self.body_accel_adrs:self.body_accel_adrs+self.body_accel_dim] 
-        body_gyro = data.sensordata[self.body_gyro_adrs:self.body_gyro_adrs+self.body_gyro_dim]
 
         # Projected gravity vector in the body frame:
-        torso_rot_mat = data.xmat
-        
+        torso_rot_mat = data.xmat[self.torso_body_id]
+        proj_grav = torso_rot_mat[2,:]  # Extract the projected gravity vector from the torso rotation matrix
+
+        # Torso velocities:
+        torso_vel = data.qvel[self.torso_qveladr:self.torso_qveladr+6]
+
+        # Accelerometer and gyroscope readings:
+        accel = data.sensordata[self.body_accel_adrs:self.body_accel_adrs+self.body_accel_dim]
+        gyro = data.sensordata[self.body_gyro_adrs:self.body_gyro_adrs+self.body_gyro_dim]
+
+
 
         # Hip Joint Positions and Velocities:
         hip_joint_positions = data.qpos[self.hip_qposadrs]  
@@ -360,13 +372,16 @@ class BaseEnv(mjx_env.MjxEnv):
         obs = jp.concatenate([
             vel_commands,
             prev_action,
-            body_accel,
-            body_gyro,
+            proj_grav,
             hip_joint_positions,
             knee_pos_sins,
             knee_pos_coss,
             joint_velocities,
-            joint_torques
+            joint_torques,
+            torso_vel,
+            accel,
+            gyro
+
             ])
         
         return obs
@@ -508,6 +523,7 @@ class BaseEnv(mjx_env.MjxEnv):
     def action_size(self) -> int:
         return self.mjx_model.nu
     
+
     @property
     def mj_model(self) -> mujoco.MjModel:
         return self._mj_model

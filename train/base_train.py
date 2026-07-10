@@ -28,9 +28,9 @@ from environment.BaseEnv import BaseEnv
 
 def main():
     resume_path = None # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/test7"  # Path to save the new PPO model parameters after training
+    save_path = "policies/test8"  # Path to save the new PPO model parameters after training
 
-    notes = "Switched to lower njmax"
+    notes = "Added value network observation with policy observation, projected gravity vector"
 
     env = BaseEnv()  # Create an instance of the BaseEnv environment
 
@@ -39,12 +39,12 @@ def main():
     env_cfg = env.config  # Retrieve the environment configuration
     ppo_params = {
         'action_repeat': 1,
-        'batch_size': 512,  
+        'batch_size': 2048,  
         'discounting': 0.995,
         'entropy_cost': 0.01,
         'episode_length': env_cfg.episode_length,
         'learning_rate': 3e-4,
-        'num_envs': 512,
+        'num_envs': 2048,
         'num_evals': 20,
         'num_minibatches': 32,
         'num_updates_per_batch': 4,
@@ -105,16 +105,15 @@ def main():
 
     
     ppo_training_params = ppo_params
-    network_factory = ppo_networks.make_ppo_networks
-    if "network_factory" in ppo_params:
-        del ppo_training_params["network_factory"]  # Remove network factory from training params since it is not a valid argument for the PPO class
-        network_factory = functools.partial(
-            ppo_networks.make_ppo_networks, 
-            **ppo_params.network_factory,
-            policy_hidden_layer_sizes = [512, 256, 256, 128],
-            value_hidden_layer_sizes = [512, 256, 256, 128],
-        )
     
+    network_factory = functools.partial(
+        ppo_networks.make_ppo_networks,
+        policy_hidden_layer_sizes = [512, 256, 256, 128],
+        value_hidden_layer_sizes = [512, 256, 256, 128],
+        policy_obs_key = "policy",
+        value_obs_key = "value",
+    )
+
     train_fn = functools.partial(
         ppo.train,
         **dict(ppo_training_params),

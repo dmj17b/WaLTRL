@@ -104,15 +104,14 @@ def main():
             )
 
 
+
             # Substitute joystick actions for testing:
             action = build_action()
 
-            # Print rotation matrix for torso:
-            # torso_rot = state.data.body("torso").xmat.reshape(3, 3)
-            rot = state.data.xmat[env.torso_body_id]
-            proj_grav = -rot[2,:]
+            torso_rot_mat = state.data.xmat[env.torso_body_id]  # Extract the torso rotation matrix from the simulation data
+            up_vector = torso_rot_mat[:, 2]  # Extract the up vector from the torso rotation matrix
+            print(f"UpVector: {up_vector}, Orientation Penalty: {jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))}")
 
-            print(f"Projected gravity: {proj_grav}")
 
             # Reset conditions:
             if state.done:

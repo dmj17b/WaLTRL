@@ -22,7 +22,7 @@ import environment.BaseEnv as BaseEnv
 print(jax.devices())
 
 def main():
-    model_path = "policies/test5"  # Path to the saved PPO model parameters
+    model_path = "policies/test8"  # Path to the saved PPO model parameters
 
     # Initialize joystick
     joystick.init()
@@ -57,6 +57,10 @@ def main():
             observation_size=env.observation_size,
             action_size=env.action_size,
             preprocess_observations_fn=running_statistics.normalize,
+            policy_obs_key = "policy",
+            value_obs_key = "value",
+            policy_hidden_layer_sizes = [512, 256, 256, 128],
+            value_hidden_layer_sizes = [512, 256, 256, 128],
         )
     )(params, deterministic=True)
 
