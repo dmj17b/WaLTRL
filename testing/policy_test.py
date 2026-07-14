@@ -19,7 +19,7 @@ from environment.BaseEnv import BaseEnv
 
 
 def main():
-    model_path = Path("policies/test3")
+    model_path = Path("policies/test8")
     if not model_path.exists():
         raise FileNotFoundError(f"Missing PPO checkpoint directory: {model_path}")
 
@@ -34,13 +34,19 @@ def main():
     step_fn = jax.jit(env.step)
 
     params = model.load_params(str(model_path))
+    params = model.load_params(model_path)
     inference_fn = ppo_networks.make_inference_fn(
         ppo_networks.make_ppo_networks(
             observation_size=env.observation_size,
             action_size=env.action_size,
             preprocess_observations_fn=running_statistics.normalize,
+            policy_obs_key = "policy",
+            value_obs_key = "value",
+            policy_hidden_layer_sizes = [512, 256, 256, 128],
+            value_hidden_layer_sizes = [512, 256, 256, 128],
         )
     )(params, deterministic=True)
+
     policy_fn = jax.jit(inference_fn)
 
     rng = jax.random.PRNGKey(2)
@@ -76,8 +82,9 @@ def main():
             reward = float(state.reward[0])
             done = bool(state.done[0])
             print(
-                f"step={int(state.info['steps'][0])} command={command.tolist()} "
-                f"reward={reward:.3f} done={done}"
+                f"Steps_Since_Cmd_Change: {int(state.info['steps_since_cmd_change'][0])}"
+                f"Command: command={command.tolist()} "
+                f"reward={float(state.metrics['penalty/zero_vel'][0]):.3f} "
             )
 
             elapsed = time.time() - start_time

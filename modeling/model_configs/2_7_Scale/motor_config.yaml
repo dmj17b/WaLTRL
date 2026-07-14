@@ -16,8 +16,8 @@ hip_params:
   no_load_speed: 502.65
   gear_ratio: 330
   rotor_inertia: 0.0002
-  damping: 0.2
-  frictionloss: 0.1
+  damping: 12.0
+  frictionloss: 10.0
 
 knee_params:
   Kp: 300
@@ -26,8 +26,8 @@ knee_params:
   no_load_speed: 502.65
   gear_ratio: 104.73
   rotor_inertia: 0.0002
-  damping: 0.2
-  frictionloss: 0.1
+  damping: 12.0
+  frictionloss: 10.0
 
 wheel_params:
   Kp: 0.0
@@ -36,5 +36,5 @@ wheel_params:
   no_load_speed: 301.6
   gear_ratio: 9.0
   rotor_inertia: 0.0002
-  damping: 0.4
+  damping: 3.0
   frictionloss: 0.1

@@ -516,6 +516,7 @@ class GenModel():
         self.spec = spec
 
 
+
     def add_contact_pairs(self,
                           added_obstacles: list = None):
         # Add contact pairs for wheel-ground interactions:

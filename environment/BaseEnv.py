@@ -115,6 +115,7 @@ class BaseEnv(mjx_env.MjxEnv):
             "penalty/roll_velocity": 0.0,
             "penalty/pitch_velocity": 0.0,
             "penalty/z_velocity": 0.0,
+            "penalty/zero_vel": 0.0,
             "train/episode_reward": 0.0,
         }
 
@@ -228,7 +229,14 @@ class BaseEnv(mjx_env.MjxEnv):
         # Action smoothing penalty:
         action_smoothing_penalty = self.reward_config.action_smoothing * jp.sum(jp.square(action - info["prev_action"]))  # Calculate the squared difference between the current action and the previous action for smoothing penalty
 
-        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty  # Calculate the total episode reward by summing rewards and subtracting penalties
+        # Zero Velocity Penalties:
+        tol = 0.01  # Tolerance for considering a command as "zero"
+        zero_vel_penalty = self.reward_config.zero_joint_vel * jp.sum(jp.square(data.qvel[self.qvel_adrs]))  # Calculate the squared joint velocities for penalty
+        zero_cmd = jp.logical_and(jp.abs(info["command"][0]) < tol, jp.abs(info["command"][1]) < tol)
+        zero_vel_penalty = jp.where(zero_cmd, zero_vel_penalty, 0.0)  # Only apply the penalty if the linear and angular velocity commands are zero
+
+
+        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty - zero_vel_penalty  # Calculate the total episode reward by summing rewards and subtracting penalties
 
 
         metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
@@ -239,6 +247,7 @@ class BaseEnv(mjx_env.MjxEnv):
         metrics["penalty/z_velocity"] = body_z_vel_penalty  # Log the Z velocity penalty in the metrics dictionary
         metrics["penalty/torques"] = torque_penalty  # Log the torque penalty in the metrics dictionary
         metrics["penalty/flipped"] = flip_penalty  # Log the fallover penalty in the metrics dictionary
+        metrics["penalty/zero_vel"] = zero_vel_penalty  # Log the zero velocity penalty in the metrics dictionary
         metrics["penalty/action_smoothing"] = action_smoothing_penalty  # Log the action smoothing penalty in the metrics dictionary
         metrics["train/episode_reward"] = episode_reward  # Accumulate the episode reward in the metrics dictionary
 
@@ -367,6 +376,8 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Torque noise:
         joint_torques = data.qfrc_actuator[self.act_ids]  # Add noise to the joint torques for observation
+
+        # Ground reaction forces:
 
         # Concatenate everything into observation vector:
         obs = jp.concatenate([
@@ -500,7 +511,6 @@ class BaseEnv(mjx_env.MjxEnv):
         self.body_upvec_sensor_id = mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, "torso_upvec")  # Get the sensor ID for the body up vector sensor
         self.body_upvec_adrs = self.mj_model.sensor_adr[self.body_upvec_sensor_id]  # Get the addresses for the body up vector sensor
         self.body_upvec_dim = self.mj_model.sensor_dim[self.body_upvec_sensor_id]  # Get the dimensionality of the body up vector sensor
-
 
 
     def _add_terrain(self):

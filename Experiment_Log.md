@@ -1,0 +1,3 @@
+- firm-night-45
+  - Lower learning rate did little for training stability or end results
+- 

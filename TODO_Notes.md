@@ -6,13 +6,14 @@
 - [ ] Joint Vel Reset
 - [x] Action space mapping
 - [x] Policy Observation getter
-  - [ ] Observation noise
+  - [x] Observation noise
     - [ ] Double check noise levels on observation are not too high
-- [ ] Value Observation getter
-  - [ ] Add ground reaction forces?
-  - [ ] Add wheel contact mask?
-  - [ ] Add direct velocities?
-  - [ ] 
+- [x] Value Observation getter
+  - [ ] Add ground reaction forces or wheel contact mask
+  - [x] Add direct velocities?
+- [ ] Reward Function Elements
+  - [ ] Zero velocity penalty
+  - [ ] Wheel slip?
 - [x] Motor Target Calculations
 - [ ] Motor Models
 - [x] Define contact pairs for wheels
