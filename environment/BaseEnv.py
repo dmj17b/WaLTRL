@@ -52,8 +52,8 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Action scaling variables:
         self.hip_action_scale = 1.25  # Scaling factor for hip joint actions to limit the range of motion
-        self.knee_action_scale = 2.5  # Scaling factor for knee joint actions to limit the range of motion
-        self.wheel_action_scale = 33.0  # Scaling factor for wheel joint velocities to limit the maximum speed
+        self.knee_action_scale = 3.5  # Scaling factor for knee joint actions to limit the range of motion
+        self.wheel_action_scale = 30.0  # Scaling factor for wheel joint velocities to limit the maximum speed
 
         # Motor parameters:
         self.motor_params = yaml.safe_load(Path(motor_config).read_text())  # Load motor parameters from the motor configuration file
@@ -253,7 +253,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
         return episode_reward
 
-    def tracking_reward(self, desired, actual, sigma=0.15):
+    def tracking_reward(self, desired, actual, sigma=0.5):
         error = desired - actual
         reward = jp.exp(-0.5 * (error / sigma) ** 2)
         return reward

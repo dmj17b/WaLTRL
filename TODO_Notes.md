@@ -6,14 +6,8 @@
 - [ ] Joint Vel Reset
 - [x] Action space mapping
 - [x] Policy Observation getter
-  - [x] Observation noise
-    - [ ] Double check noise levels on observation are not too high
 - [x] Value Observation getter
-  - [ ] Add ground reaction forces or wheel contact mask
-  - [x] Add direct velocities?
-- [ ] Reward Function Elements
-  - [ ] Zero velocity penalty
-  - [ ] Wheel slip?
+- [x] Zero velocity penalty
 - [x] Motor Target Calculations
 - [ ] Motor Models
 - [x] Define contact pairs for wheels
@@ -22,10 +16,7 @@
 - [x] Double check that the flip-over condition is not overly generous (wasting time steps when all but guaranteed to flip)
 
 
-# Questions to answer/things to figure out
-- [x] Where should I add in armature?
-  - Just put everything into the actuator
-- [x] How is armature calculated with joint vs actuator armature?
-  - I_total = I_joint + (I_actuator*gear^2) 
-
-
+# Ideas for improving training
+- [ ] Adding wheel ground reaction forces to value observation
+- [ ] Adding wheel slip penalties?
+- [ ] 

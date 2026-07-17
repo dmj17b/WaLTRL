@@ -30,7 +30,7 @@ def main():
     resume_path = None # Path to the saved PPO model parameters to resume training from
     save_path = "policies/test8"  # Path to save the new PPO model parameters after training
 
-    notes = "Increased command duration limits and zero velocity penalties."
+    notes = "Decreased learning rate and num updates per batch. Increased chance of zero vel command"
 
     env = BaseEnv()  # Create an instance of the BaseEnv environment
 
@@ -39,19 +39,19 @@ def main():
     env_cfg = env.config  # Retrieve the environment configuration
     ppo_params = {
         'action_repeat': 1,
-        'batch_size': 2048,  
+        'batch_size': 512,  
         'discounting': 0.995,
-        'entropy_cost': 0.001,
+        'entropy_cost': 0.01,
         'episode_length': env_cfg.episode_length,
         'learning_rate': 3e-5,
         'num_envs': 2048,
         'num_evals': 20,
         'num_minibatches': 32,
-        'num_updates_per_batch': 4,
+        'num_updates_per_batch': 2,
         'num_timesteps': 200_000_000,
         'normalize_observations': True,
         'reward_scaling': 1.0,
-        'unroll_length': 32,
+        'unroll_length': 128,
         'deterministic_eval': True,
         }
 
@@ -108,6 +108,7 @@ def main():
     
     network_factory = functools.partial(
         ppo_networks.make_ppo_networks,
+        # policy_hidden_layer_sizes = [512, 256, 256, 128],
         policy_hidden_layer_sizes = [512, 256, 256, 128],
         value_hidden_layer_sizes = [512, 256, 256, 128],
         policy_obs_key = "policy",

@@ -29,7 +29,7 @@ class CommandConfig:
     max_cmd_duration: float = 10.0
     zero_lin_prob: float = 0.1
     zero_ang_prob: float = 0.1
-    zero_all_prob: float = 0.1
+    zero_all_prob: float = 0.4
 
 
 @flax.struct.dataclass

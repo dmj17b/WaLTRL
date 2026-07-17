@@ -46,10 +46,7 @@ with mujoco.viewer.launch_passive(m, d) as viewer:
         pygame.event.pump()  # Process event queue to update joystick state
 
 
-        max_contacts = max(max_contacts, d.ncon)  # Ensure at least one contact is allocated
-        max_constraints = max(max_constraints, d.nefc)
-        print(f"Max contacts: {max_contacts}")
-        print(f"Max constraints: {max_constraints}")
+    
 
         # Rudimentary time keeping, will drift relative to wall clock.
         time_until_next_step = (m.opt.timestep - (time.time() - start_time))

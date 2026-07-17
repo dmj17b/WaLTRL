@@ -108,11 +108,9 @@ def main():
             # Substitute joystick actions for testing:
             action = build_action()
 
-            torso_rot_mat = state.data.xmat[env.torso_body_id]  # Extract the torso rotation matrix from the simulation data
-            up_vector = torso_rot_mat[:, 2]  # Extract the up vector from the torso rotation matrix
-            print(f"UpVector: {up_vector}, Orientation Penalty: {jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))}")
-
-
+            print(f"Body Linear Velocity: {state.data.sensordata[env.body_lin_vel_adrs]}, Angular Velocity: {state.data.qvel[env.torso_qveladr+5]}")
+            print(f"Command: {state.info['command']}")
+            print(f"Zero Vel Penalty: {state.metrics['penalty/zero_vel']}")
             # Reset conditions:
             if state.done:
                 print("Episode done. Resetting environment.")

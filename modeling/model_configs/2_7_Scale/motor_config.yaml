@@ -31,10 +31,10 @@ knee_params:
 
 wheel_params:
   Kp: 0.0
-  Kd: 8.0
+  Kd: 12.0
   stall_torque: 5.33
   no_load_speed: 301.6
   gear_ratio: 9.0
   rotor_inertia: 0.0002
-  damping: 3.0
+  damping: 1.0
   frictionloss: 0.1
