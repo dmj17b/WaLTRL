@@ -28,10 +28,10 @@ from configs.refine_config import SimConfig, RewardConfig, CommandConfig, NoiseC
 
 
 def main():
-    resume_path = "policies/best_tracking2" # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/refine2"  # Path to save the new PPO model parameters after training
+    resume_path = "policies/initial1" # Path to the saved PPO model parameters to resume training from
+    save_path = "policies/refine4"  # Path to save the new PPO model parameters after training
 
-    notes = "Second refinement run. Starting from pleasant-dust-67"
+    notes = "Starting from desert-fire-72. Refine training. Increased penalties"
 
     env = BaseEnv(sim_config = SimConfig(),
             reward_config = RewardConfig(),
@@ -44,9 +44,9 @@ def main():
         'action_repeat': 1,
         'batch_size': 512,  
         'discounting': 0.995,
-        'entropy_cost': 0.001,
+        'entropy_cost': 0.01,
         'episode_length': env_cfg.episode_length,
-        'learning_rate': 3e-5,
+        'learning_rate': 3e-4,
         'num_envs': 2048,
         'num_evals': 10,
         'num_minibatches': 32,

@@ -28,9 +28,9 @@ from environment.BaseEnv import BaseEnv
 
 def main():
     resume_path = None # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/test8"  # Path to save the new PPO model parameters after training
+    save_path = "policies/initial1"  # Path to save the new PPO model parameters after training
 
-    notes = "Discounting to 0.995 from 0.99. Pitch/roll vel increased to 10, flipped penalty increased by 10x. Torque penalty increased by 10x"
+    notes = "Another initial training test but now with T pose deviation and wheel collision penalties"
 
     env = BaseEnv()  # Create an instance of the BaseEnv environment
 

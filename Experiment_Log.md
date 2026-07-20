@@ -14,4 +14,5 @@
   - First attempt to do a refinement training (starting from pleasant-dust-67)
   - Little noticable improvement. Policy is still a bit jittery, front/back wheels collide often
   - Orientation penalties are also doing little. Might need to try the task reward formulation that I used in 2D
-  - 
+- desert-fire-72
+  - Trying to do another initial training from scratch to see how much the T-pose and wheel collision penalties are helping

@@ -12,11 +12,13 @@ class RewardConfig:
     ang_vel_tracking: float = 1000.0
     body_pitch_vel: float = 10.0
     body_roll_vel: float = 10.0
-    orientation: float = 50.0
-    low_torques: float = 0.0001
+    orientation: float = 500.0
+    low_torques: float = 0.001
     body_z_vel: float = 0.5
     action_smoothing: float = 1.0
     flipped: float = 10000.0
+    wheel_collision: float = 100.0
+    t_pose_deviation: float = 1.0
     zero_joint_vel: float = 10.0
     success_bonus: float = 1000.0
 

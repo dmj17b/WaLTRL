@@ -108,9 +108,8 @@ def main():
             # Substitute joystick actions for testing:
             action = build_action()
 
-            print(f"Body Linear Velocity: {state.data.sensordata[env.body_lin_vel_adrs]}, Angular Velocity: {state.data.qvel[env.torso_qveladr+5]}")
-            print(f"Command: {state.info['command']}")
-            print(f"Zero Vel Penalty: {state.metrics['penalty/zero_vel']}")
+            # Test wheel collision detection:
+            print(f"T Pose Deviation Penalty: {state.metrics['penalty/t_pose_deviation']}, Wheel Collision Penalty: {state.metrics['penalty/wheel_collisions']}")
             # Reset conditions:
             if state.done:
                 print("Episode done. Resetting environment.")

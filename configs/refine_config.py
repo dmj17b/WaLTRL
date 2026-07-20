@@ -17,16 +17,18 @@ class RewardConfig:
     body_z_vel: float = 5.0
     action_smoothing: float = 10.0
     flipped: float = 10000.0
-    zero_joint_vel: float = 10.0
+    wheel_collision: float = 1000.0
+    t_pose_deviation: float = 100.0
+    zero_joint_vel: float = 100.0
     success_bonus: float = 1000.0
 
 
 @flax.struct.dataclass
 class CommandConfig:
     max_lin_vel: float = 2.0
-    max_ang_vel: float = 1.0
-    min_cmd_duration: float = 2.0
-    max_cmd_duration: float = 5.0
+    max_ang_vel: float = 0.6
+    min_cmd_duration: float = 4.0
+    max_cmd_duration: float = 10.0
     zero_lin_prob: float = 0.1
     zero_ang_prob: float = 0.1
     zero_all_prob: float = 0.2

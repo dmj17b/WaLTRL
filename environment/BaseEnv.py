@@ -116,6 +116,8 @@ class BaseEnv(mjx_env.MjxEnv):
             "penalty/pitch_velocity": 0.0,
             "penalty/z_velocity": 0.0,
             "penalty/zero_vel": 0.0,
+            "penalty/wheel_collisions": 0.0,
+            "penalty/t_pose_deviation": 0.0,
             "train/episode_reward": 0.0,
         }
 
@@ -195,6 +197,29 @@ class BaseEnv(mjx_env.MjxEnv):
 
         return mjx_env.State(data, obs, reward, done, metrics, info)
     
+    def hip_controller(self, data: mjx.Data, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
+        '''Calculate the control signals for the hip motors based on the current state, action, and command.'''
+        hip_targets = self.hip_action_scale*hip_actions
+        des_torques = self.hip_motor_params["Kp"] * (hip_targets - data.qpos[self.hip_qposadrs]) + self.hip_motor_params["Kd"] * (0 - data.qvel[self.hip_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
+        actual_torques = self.motor_model(des_torques, data.qvel[self.hip_qveladrs], self.hip_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return actual_torques
+
+    def knee_controller(self, data, knee_targets, rng):
+        des_torques = (self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs])
+                    + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs]))
+        return self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)
+            
+    def wheel_controller(self, data: mjx.Data, wheel_actions: jax.Array, rng: jax.Array) -> jax.Array:
+        '''Calculate the control signals for the wheel motors based on the current state, action, and command.'''
+        wheel_targets = self.wheel_action_scale*wheel_actions  # Calculate target wheel velocities by scaling the actions
+        des_torques = self.wheel_motor_params["Kd"] * (wheel_targets - data.qvel[self.wheel_qveladrs])  # Velocity control law to calculate desired torques based on velocity error
+        actual_torques = self.motor_model(des_torques, data.qvel[self.wheel_qveladrs], self.wheel_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+        return actual_torques
+
+    def motor_model(self, des_torques: jax.Array, curr_vel: jax.Array, motor_params: dict) -> jax.Array:
+        '''NOT IMPLEMENTED: Placeholder to restrict desired torques based on motor speed-torque curves.'''
+        return des_torques  # Placeholder for motor model implementation that limits torques based on speed-torque curves
+
     # REWARD FUNCTION
     def _get_reward(self, 
                     data: mjx.Data, 
@@ -237,8 +262,16 @@ class BaseEnv(mjx_env.MjxEnv):
         zero_cmd = jp.logical_and(jp.abs(info["command"][0]) < tol, jp.abs(info["command"][1]) < tol)
         zero_vel_penalty = jp.where(zero_cmd, zero_vel_penalty, 0.0)  # Only apply the penalty if the linear and angular velocity commands are zero
 
+        # Wheel Collision Penalty:
+        wheel_touch_penalty = self.wheel_touch_penalty(data)  # Calculate the penalty for wheel collisions based on the current simulation data
 
-        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty - zero_vel_penalty  # Calculate the total episode reward by summing rewards and subtracting penalties
+        # T-Pose Deviation Penalty:
+        t_pose_deviation_penalty = self.t_pose_deviation_penalty(data)  
+
+        # Calculate the total episode reward by summing rewards and subtracting penalties
+        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty \
+              - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty - zero_vel_penalty \
+             - wheel_touch_penalty  - t_pose_deviation_penalty
 
 
         metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
@@ -251,6 +284,8 @@ class BaseEnv(mjx_env.MjxEnv):
         metrics["penalty/flipped"] = flip_penalty  # Log the fallover penalty in the metrics dictionary
         metrics["penalty/zero_vel"] = zero_vel_penalty  # Log the zero velocity penalty in the metrics dictionary
         metrics["penalty/action_smoothing"] = action_smoothing_penalty  # Log the action smoothing penalty in the metrics dictionary
+        metrics["penalty/wheel_collisions"] = wheel_touch_penalty  # Log the wheel collision penalty in the metrics dictionary
+        metrics["penalty/t_pose_deviation"] = t_pose_deviation_penalty  # Log the T-pose deviation penalty in the metrics dictionary
         metrics["train/episode_reward"] = episode_reward  # Accumulate the episode reward in the metrics dictionary
 
         return episode_reward
@@ -259,36 +294,40 @@ class BaseEnv(mjx_env.MjxEnv):
         error = desired - actual
         reward = jp.exp(-0.5 * (error / sigma) ** 2)
         return reward
+    
 
-    def hip_controller(self, data: mjx.Data, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
-        '''Calculate the control signals for the hip motors based on the current state, action, and command.'''
-        hip_targets = self.hip_action_scale*hip_actions
-        des_torques = self.hip_motor_params["Kp"] * (hip_targets - data.qpos[self.hip_qposadrs]) + self.hip_motor_params["Kd"] * (0 - data.qvel[self.hip_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
-        actual_torques = self.motor_model(des_torques, data.qvel[self.hip_qveladrs], self.hip_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-        return actual_torques
+    def wheel_touch_penalty(self, data: mjx.Data) -> jax.Array:
+        # Extract Cartesian positions for all relevant wheels (Shape: 2x3)
+        l_torso_pos = data.geom_xpos[self.left_torso_wheels]
+        l_head_pos = data.geom_xpos[self.left_head_wheels]
+        
+        r_torso_pos = data.geom_xpos[self.right_torso_wheels]
+        r_head_pos = data.geom_xpos[self.right_head_wheels]
+        
+        # Compute pairwise distances using broadcasting: (2, 1, 3) - (1, 2, 3) -> (2, 2, 3)
+        l_diffs = l_torso_pos[:, None, :] - l_head_pos[None, :, :]
+        l_dists = jp.linalg.norm(l_diffs, axis=-1)
+        
+        r_diffs = r_torso_pos[:, None, :] - r_head_pos[None, :, :]
+        r_dists = jp.linalg.norm(r_diffs, axis=-1)
+        
+        # Count the number of active collisions
+        l_contact_count = jp.sum(l_dists < self.wheel_collision_threshold)
+        r_contact_count = jp.sum(r_dists < self.wheel_collision_threshold)
+        total_contacts = l_contact_count + r_contact_count
+        
+        # Apply penalty weight per active contact
+        penalty_amount = 1.0 
+        return total_contacts * self.reward_config.wheel_collision
 
-    # def knee_controller(self, data: mjx.Data, knee_actions: jax.Array, rng: jax.Array) -> jax.Array:
-    #     '''Calculate the control signals for the knee motors based on the current state, action, and command.'''
-    #     knee_targets = data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
-    #     des_torques = self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs]) + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
-    #     actual_torques = self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-    #     return actual_torques
-    def knee_controller(self, data, knee_targets, rng):
-        des_torques = (self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs])
-                    + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs]))
-        return self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)
-            
-    def wheel_controller(self, data: mjx.Data, wheel_actions: jax.Array, rng: jax.Array) -> jax.Array:
-        '''Calculate the control signals for the wheel motors based on the current state, action, and command.'''
-        wheel_targets = self.wheel_action_scale*wheel_actions  # Calculate target wheel velocities by scaling the actions
-        des_torques = self.wheel_motor_params["Kd"] * (wheel_targets - data.qvel[self.wheel_qveladrs])  # Velocity control law to calculate desired torques based on velocity error
-        actual_torques = self.motor_model(des_torques, data.qvel[self.wheel_qveladrs], self.wheel_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-        return actual_torques
 
-    def motor_model(self, des_torques: jax.Array, curr_vel: jax.Array, motor_params: dict) -> jax.Array:
-        '''NOT IMPLEMENTED: Placeholder to restrict desired torques based on motor speed-torque curves.'''
-        return des_torques  # Placeholder for motor model implementation that limits torques based on speed-torque curves
-
+    # WIP: Penalizes deviation from T-Pose leg positions. 
+    def t_pose_deviation_penalty(self, data:mjx.Data):
+        hip_deviations = data.qpos[self.hip_qposadrs] - jp.array([0.0, 0.0, 0.0, 0.0])
+        knee_deviations = jp.sin(data.qpos[self.knee_qposadrs]) - jp.array([0.0, 0.0, 0.0, 0.0])
+        hip_penalty = jp.sum(jp.square(hip_deviations))
+        knee_penalty = jp.sum(jp.square(knee_deviations))
+        return hip_penalty + knee_penalty
 
 
     def _get_policy_obs(self, data: mjx.Data, info: Dict[str, Any]) -> jax.Array:
@@ -518,6 +557,40 @@ class BaseEnv(mjx_env.MjxEnv):
         self.body_upvec_adrs = self.mj_model.sensor_adr[self.body_upvec_sensor_id]  # Get the addresses for the body up vector sensor
         self.body_upvec_dim = self.mj_model.sensor_dim[self.body_upvec_sensor_id]  # Get the dimensionality of the body up vector sensor
 
+        self.wheel_geom_names = [
+            'torso_left_front_wheel_geom',
+            'torso_left_rear_wheel_geom',
+            'torso_right_front_wheel_geom',
+            'torso_right_rear_wheel_geom',
+            'head_left_front_wheel_geom',
+            'head_left_rear_wheel_geom',
+            'head_right_front_wheel_geom',
+            'head_right_rear_wheel_geom',
+        ]
+        # Wheel Geometry IDs for distance-based collision detection
+        self.left_torso_wheels = jp.array([
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'torso_left_front_wheel_geom'),
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'torso_left_rear_wheel_geom')
+        ])
+        self.left_head_wheels = jp.array([
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'head_left_front_wheel_geom'),
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'head_left_rear_wheel_geom')
+        ])
+        
+        self.right_torso_wheels = jp.array([
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'torso_right_front_wheel_geom'),
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'torso_right_rear_wheel_geom')
+        ])
+        self.right_head_wheels = jp.array([
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'head_right_front_wheel_geom'),
+            mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, 'head_right_rear_wheel_geom')
+        ])
+
+        # Extract wheel radius from the first wheel's size definition to set the threshold
+        wheel_geom_id = self.left_torso_wheels[0]
+        # Collision occurs if center-to-center distance is less than 2x radius
+        self.wheel_collision_threshold = 2.0 * self.mj_model.geom_size[wheel_geom_id, 0]
+        self.wheel_geom_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, name) for name in self.wheel_geom_names]  # Get the geometry IDs for the wheel geometries
 
     def _add_terrain(self):
         '''Defines the terrain for the environment and then applies necessary contact pairs.
