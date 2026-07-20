@@ -506,7 +506,7 @@ class GenModel():
 
         # Orientation sensor:
         spec.add_sensor(
-            name = 'torso_upvector',
+            name = 'torso_upvec',
             type = mujoco.mjtSensor.mjSENS_FRAMEZAXIS,
             objname = 'torso_com',
             objtype = mujoco.mjtObj.mjOBJ_SITE,

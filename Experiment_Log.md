@@ -1,3 +1,12 @@
 - firm-night-45
   - Lower learning rate did little for training stability or end results
-- 
+- astral-star-63
+  - Best velocity tracking I've got in a while.
+  - Increased lin/ang vel tracking by a factor of 10
+  - Still very unrefined behavior but at least tracking velocities
+- hopeful-dust-65
+  - better than astral-star-63
+  - Increased width of tracking kernel to 0.4
+- Ethereal-plant-66
+  - Best vel tracking yet but poor stabilization
+  - Similar to previous run just more time steps and orientation penalty bumped to 50 from 20

@@ -152,10 +152,12 @@ class BaseEnv(mjx_env.MjxEnv):
         knee_actions = action[self.knee_act_ids]
         wheel_actions = action[self.wheel_act_ids]
 
+        knee_targets = data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
+
         def _substep(carry: mjx.Data, unused_t) -> Tuple[mjx.Data, None]:
             # Apply PD Control laws
             hip_torques = self.hip_controller(carry, hip_actions, state.info["rng"])
-            knee_torques = self.knee_controller(carry, knee_actions, state.info["rng"])
+            knee_torques = self.knee_controller(carry, knee_targets, state.info["rng"])
             wheel_torques = self.wheel_controller(carry, wheel_actions, state.info["rng"])
 
             # Combine torques into a single vector for all actuators:
@@ -253,7 +255,7 @@ class BaseEnv(mjx_env.MjxEnv):
 
         return episode_reward
 
-    def tracking_reward(self, desired, actual, sigma=0.5):
+    def tracking_reward(self, desired, actual, sigma=0.4):
         error = desired - actual
         reward = jp.exp(-0.5 * (error / sigma) ** 2)
         return reward
@@ -265,13 +267,17 @@ class BaseEnv(mjx_env.MjxEnv):
         actual_torques = self.motor_model(des_torques, data.qvel[self.hip_qveladrs], self.hip_motor_params)  # Apply motor model to limit torques based on speed-torque curves
         return actual_torques
 
-    def knee_controller(self, data: mjx.Data, knee_actions: jax.Array, rng: jax.Array) -> jax.Array:
-        '''Calculate the control signals for the knee motors based on the current state, action, and command.'''
-        knee_targets = data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
-        des_torques = self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs]) + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
-        actual_torques = self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)  # Apply motor model to limit torques based on speed-torque curves
-        return actual_torques
-
+    # def knee_controller(self, data: mjx.Data, knee_actions: jax.Array, rng: jax.Array) -> jax.Array:
+    #     '''Calculate the control signals for the knee motors based on the current state, action, and command.'''
+    #     knee_targets = data.qpos[self.knee_qposadrs] + self.knee_action_scale*knee_actions  # Calculate target knee positions by adding scaled actions to current positions
+    #     des_torques = self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs]) + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs])  # PD control law to calculate desired torques based on position error and velocity error
+    #     actual_torques = self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)  # Apply motor model to limit torques based on speed-torque curves
+    #     return actual_torques
+    def knee_controller(self, data, knee_targets, rng):
+        des_torques = (self.knee_motor_params["Kp"] * (knee_targets - data.qpos[self.knee_qposadrs])
+                    + self.knee_motor_params["Kd"] * (0 - data.qvel[self.knee_qveladrs]))
+        return self.motor_model(des_torques, data.qvel[self.knee_qveladrs], self.knee_motor_params)
+            
     def wheel_controller(self, data: mjx.Data, wheel_actions: jax.Array, rng: jax.Array) -> jax.Array:
         '''Calculate the control signals for the wheel motors based on the current state, action, and command.'''
         wheel_targets = self.wheel_action_scale*wheel_actions  # Calculate target wheel velocities by scaling the actions

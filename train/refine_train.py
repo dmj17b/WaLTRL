@@ -24,15 +24,18 @@ import inspect
 from pathlib import Path
 import wandb
 from environment.BaseEnv import BaseEnv
+from configs.refine_config import SimConfig, RewardConfig, CommandConfig, NoiseConfig  # Import configuration dataclasses.
 
 
 def main():
-    resume_path = None # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/test8"  # Path to save the new PPO model parameters after training
+    resume_path = "policies/best_tracking2" # Path to the saved PPO model parameters to resume training from
+    save_path = "policies/refine2"  # Path to save the new PPO model parameters after training
 
-    notes = "Discounting to 0.995 from 0.99. Pitch/roll vel increased to 10, flipped penalty increased by 10x. Torque penalty increased by 10x"
+    notes = "Second refinement run. Starting from pleasant-dust-67"
 
-    env = BaseEnv()  # Create an instance of the BaseEnv environment
+    env = BaseEnv(sim_config = SimConfig(),
+            reward_config = RewardConfig(),
+            command_config = CommandConfig(),)  # Create an instance of the BaseEnv environment
 
     wrapper_fn = wrapper.wrap_for_brax_training  # Use the standard Brax wrapper for training
     
@@ -43,12 +46,12 @@ def main():
         'discounting': 0.995,
         'entropy_cost': 0.001,
         'episode_length': env_cfg.episode_length,
-        'learning_rate': 3e-4,
+        'learning_rate': 3e-5,
         'num_envs': 2048,
-        'num_evals': 20,
+        'num_evals': 10,
         'num_minibatches': 32,
         'num_updates_per_batch': 8,
-        'num_timesteps': 200_000_000,
+        'num_timesteps': 100_000_000,
         'normalize_observations': True,
         'reward_scaling': 1.0,
         'unroll_length': 128,

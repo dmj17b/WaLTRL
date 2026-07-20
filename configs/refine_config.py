@@ -10,12 +10,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 class RewardConfig:
     lin_vel_tracking: float = 1000.0
     ang_vel_tracking: float = 1000.0
-    body_pitch_vel: float = 10.0
-    body_roll_vel: float = 10.0
-    orientation: float = 50.0
-    low_torques: float = 0.0001
-    body_z_vel: float = 0.5
-    action_smoothing: float = 1.0
+    body_pitch_vel: float = 100.0
+    body_roll_vel: float = 100.0
+    orientation: float = 1000.0
+    low_torques: float = 0.01
+    body_z_vel: float = 5.0
+    action_smoothing: float = 10.0
     flipped: float = 10000.0
     zero_joint_vel: float = 10.0
     success_bonus: float = 1000.0
@@ -25,8 +25,8 @@ class RewardConfig:
 class CommandConfig:
     max_lin_vel: float = 2.0
     max_ang_vel: float = 1.0
-    min_cmd_duration: float = 4.0
-    max_cmd_duration: float = 10.0
+    min_cmd_duration: float = 2.0
+    max_cmd_duration: float = 5.0
     zero_lin_prob: float = 0.1
     zero_ang_prob: float = 0.1
     zero_all_prob: float = 0.2
