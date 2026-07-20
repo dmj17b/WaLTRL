@@ -10,3 +10,8 @@
 - Ethereal-plant-66
   - Best vel tracking yet but poor stabilization
   - Similar to previous run just more time steps and orientation penalty bumped to 50 from 20
+- absurd-snoball-68
+  - First attempt to do a refinement training (starting from pleasant-dust-67)
+  - Little noticable improvement. Policy is still a bit jittery, front/back wheels collide often
+  - Orientation penalties are also doing little. Might need to try the task reward formulation that I used in 2D
+  - 
