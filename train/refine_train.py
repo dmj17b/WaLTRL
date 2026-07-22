@@ -28,10 +28,11 @@ from configs.refine_config import SimConfig, RewardConfig, CommandConfig, NoiseC
 
 
 def main():
-    resume_path = "policies/initial1" # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/refine4"  # Path to save the new PPO model parameters after training
+    # resume_path = "policies/initial1" # Path to the saved PPO model parameters to resume training from
+    resume_path = None  # Set to None to start training from scratch
+    save_path = "policies/refine5"  # Path to save the new PPO model parameters after training
 
-    notes = "Starting from desert-fire-72. Refine training. Increased penalties"
+    notes = "Same as last. Tracking sigma increased to 0.3"
 
     env = BaseEnv(sim_config = SimConfig(),
             reward_config = RewardConfig(),
@@ -42,19 +43,19 @@ def main():
     env_cfg = env.config  # Retrieve the environment configuration
     ppo_params = {
         'action_repeat': 1,
-        'batch_size': 512,  
+        'batch_size': 256,  
         'discounting': 0.995,
-        'entropy_cost': 0.01,
+        'entropy_cost': 0.001,
         'episode_length': env_cfg.episode_length,
-        'learning_rate': 3e-4,
-        'num_envs': 2048,
-        'num_evals': 10,
-        'num_minibatches': 32,
+        'learning_rate': 1e-4,
+        'num_envs': 4096,
+        'num_evals': 20,
+        'num_minibatches': 16,
         'num_updates_per_batch': 8,
-        'num_timesteps': 100_000_000,
+        'num_timesteps': 500_000_000,
         'normalize_observations': True,
         'reward_scaling': 1.0,
-        'unroll_length': 128,
+        'unroll_length': 256,
         'deterministic_eval': True,
         'seed': 42,
         }

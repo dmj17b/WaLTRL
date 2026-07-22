@@ -22,7 +22,7 @@ import environment.BaseEnv as BaseEnv
 print(jax.devices())
 
 def main():
-    model_path = "policies/refine4"  # Path to the saved PPO model parameters
+    model_path = "policies/refine5"  # Path to the saved PPO model parameters
 
     # Initialize joystick
     joystick.init()
@@ -94,6 +94,8 @@ def main():
             info['command'] = jp.asarray(velocity_command)
             state = state.replace(info=info)  # Update the state info with the new command
 
+            
+
 
             # Update the MJX state with any changes from viewer interactions (e.g., user dragging the model)
             state = state.replace(
@@ -111,6 +113,8 @@ def main():
             if n_steps % 5 == 0:
                 action = jit_inference_fn(state.obs, key)  # Get action from the PPO policy
 
+
+            print(f"Command: {state.info['command']} - Action smoothing penalty: {state.metrics['penalty/action_smoothing']}")
 
             state = step_fn(state, action[0])  # Step the environment
             n_steps += 1

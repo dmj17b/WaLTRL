@@ -10,14 +10,16 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 class RewardConfig:
     lin_vel_tracking: float = 1000.0
     ang_vel_tracking: float = 1000.0
+    tracking_sigma: float = 0.4
     body_pitch_vel: float = 10.0
     body_roll_vel: float = 10.0
     orientation: float = 500.0
     low_torques: float = 0.001
     body_z_vel: float = 0.5
     action_smoothing: float = 1.0
+    zero_vel_smoothing_multiplier: float = 2.0  # Multiplier for action smoothing penalty when command is zero
     flipped: float = 10000.0
-    wheel_collision: float = 100.0
+    wheel_collision: float = 800.0
     t_pose_deviation: float = 1.0
     zero_joint_vel: float = 10.0
     success_bonus: float = 1000.0

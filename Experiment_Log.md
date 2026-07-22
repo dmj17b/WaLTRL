@@ -16,3 +16,35 @@
   - Orientation penalties are also doing little. Might need to try the task reward formulation that I used in 2D
 - desert-fire-72
   - Trying to do another initial training from scratch to see how much the T-pose and wheel collision penalties are helping
+- giddy-sea-82
+  - One of the most refined policies I've achieved
+  - Still a decent amount of jitter in the joints. Action smoothing isn't doing much
+  - Managed to get parameters that work with long unroll length and 2048 environments
+  - Need to better understand what the tradeoff is between num_minibatches, batch_size, and num_envs, because all significantly affect memory usage
+- dazzling-forest-83
+  - Better than previous. Less unnecessary joint motion. Still a bit jittery
+  - Splays legs weirdly when tracking velocities. Not sure why 
+  - Managed to get 4096 environments by lowering num_minibatches and batch_size
+  - Shaved off a minute or two of training time
+- vivid-water-86
+  - Getting even better
+  - Lowered min/max command durations from 4/10 to 2/5
+  - Looks like lowering command durations resulted in more training data to prevent flip-overs when rapidly changing directions
+- sunny-valley-87
+  - Testing my "refine" training parameters to see if they can train a decent policy from scratch
+  - Velocity tracking isn't perfect, but this is the closest I've had to a "perfect" driving policy
+  - When tracking linear velocity, policy would match velocity for a few seconds, then "brake" as if commanded to do so. Perhaps the policy learned to anticipate the command change and slows down in advance
+- good-fire-88
+  - Similar conditions as sunny-valley-87 but increased num_timesteps and max_cmd_duration
+- fearless-butterfly-89
+  - Not bad but had some weird asymmetric leg behavior. One side stuck to T pose, other side folded up
+- faithful-eon-90
+  - Tried increasing learning rate to see what would happen
+  - Started pushing predefined contact limits
+- worthy-snowball-91
+  - Everything looked good EXCEPT velocity tracking... linear tracking was nearly inverted, going backwards with a forward command
+  - Next run will increase tracking kernel width to see if policy will follow gradient better
+- honest-snow-92
+  - Increased tracking sigma to 0.3 from 0.2. Did not change ANYTHING else
+  - Tracking was a little better than previous but behavior was still abnormal
+  - I don't think T-Pose deviation penalty is helping much

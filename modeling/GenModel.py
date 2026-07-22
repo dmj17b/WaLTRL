@@ -7,7 +7,8 @@ from pathlib import Path
 import yaml
 import numpy as np
 import mujoco
-
+import jax
+from scipy.ndimage import gaussian_filter
 
 
 class GenModel():
@@ -637,7 +638,45 @@ class GenModel():
             material="groundplane_material",
             name = 'floor',
         )
+    def add_hfield(self, 
+                   height: float = 0.5,
+                   sigma: float = 0.6,
+                   rng: jax.random.PRNGKey = jax.random.PRNGKey(0)
+                   ):
+        # Add a heightfield to the environment for testing using perlin noise:
+        nrow, ncol = 128, 128
+        size = [30.0, 30.0, height, 0.5]  # [x_span, y_span, z_height, base_offset]
+        # Add some random noise to the height field
+        heightfield_data = np.zeros((nrow, ncol))
+        rng = np.random.default_rng(seed=42)
+        heightfield_data = heightfield_data + rng.uniform(0, height, size=(nrow, ncol)) 
+        heightfield_data = gaussian_filter(heightfield_data, sigma=sigma)  # Smooth the heightfield with a Gaussian filter
+        hfdata_flat = heightfield_data.flatten()
+        self.spec.add_hfield(
+            name='terrain',
+            nrow=nrow,
+            ncol=ncol,
+            size=size,
+            userdata=hfdata_flat,
+        )
 
+        # Add material for heightfield
+        self.spec.add_material(
+            name="hfield_material",
+            texrepeat=[5, 5],
+            reflectance=0.0,
+        ).textures[mujoco.mjtTextureRole.mjTEXROLE_RGB] = 'ground_texture'
+        terrain_body = self.spec.worldbody.add_body(
+            name='terrain_body', 
+            pos=[0, 0, 0],
+            mocap = True,)
+        terrain_body.add_geom(
+            name='floor',
+            type=mujoco.mjtGeom.mjGEOM_HFIELD,
+            hfieldname='terrain',
+            pos=[0, 0, -0.75],
+            material='hfield_material',
+        ) 
 
     def add_box(self, pos:list, size:list, **kwargs):
         if 'name' in kwargs:

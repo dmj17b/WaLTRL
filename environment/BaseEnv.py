@@ -228,8 +228,13 @@ class BaseEnv(mjx_env.MjxEnv):
                     metrics: Dict[str, Any]) -> jax.Array:
         '''Basic reward function. This will likely be overwritten for most other environments, but common reward components can be implemented here.'''
         # Tracking rewards:
-        lin_vel_tracking_reward = self.reward_config.lin_vel_tracking * self.tracking_reward(info["command"][0], data.sensordata[self.body_lin_vel_adrs])  # Calculate linear velocity tracking reward based on the current command and the body linear velocity from the sensor data
-        ang_vel_tracking_reward = self.reward_config.ang_vel_tracking * self.tracking_reward(info["command"][1], data.qvel[self.torso_qveladr+5])  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
+        # Calculate linear velocity tracking reward based on the current command and the body linear velocity from the sensor data
+        lin_vel_tracking_reward = self.reward_config.lin_vel_tracking * self.tracking_reward(info["command"][0], 
+                                                                                             data.sensordata[self.body_lin_vel_adrs],
+                                                                                             sigma = self.reward_config.tracking_sigma)  
+        ang_vel_tracking_reward = self.reward_config.ang_vel_tracking * self.tracking_reward(info["command"][1], 
+                                                                                             data.qvel[self.torso_qveladr+5],
+                                                                                             sigma = self.reward_config.tracking_sigma)  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
 
         # Orientation Penalty:
         torso_rot_mat = data.xmat[self.torso_body_id]  # Extract the torso rotation matrix from the simulation data
@@ -253,14 +258,20 @@ class BaseEnv(mjx_env.MjxEnv):
         flipped = jp.where(up_vector[2] < 0.1, 1.0, 0.0)  # Check if the up vector's Z component is less than 0 (indicating a fallover)
         flip_penalty = flipped*self.reward_config.flipped  # Apply a penalty for falling over
 
-        # Action smoothing penalty:
-        action_smoothing_penalty = self.reward_config.action_smoothing * jp.sum(jp.square(action - info["prev_action"]))  # Calculate the squared difference between the current action and the previous action for smoothing penalty
 
         # Zero Velocity Penalties:
-        tol = 0.01  # Tolerance for considering a command as "zero"
+        tol = 0.05  # Tolerance for considering a command as "zero"
         zero_vel_penalty = self.reward_config.zero_joint_vel * jp.sum(jp.square(data.qvel[self.qvel_adrs]))  # Calculate the squared joint velocities for penalty
         zero_cmd = jp.logical_and(jp.abs(info["command"][0]) < tol, jp.abs(info["command"][1]) < tol)
         zero_vel_penalty = jp.where(zero_cmd, zero_vel_penalty, 0.0)  # Only apply the penalty if the linear and angular velocity commands are zero
+        
+        # Action smoothing penalty:
+        action_smoothing_penalty = self.reward_config.action_smoothing * jp.sum(jp.square(action - info["prev_action"]))  # Calculate the squared difference between the current action and the previous action for smoothing penalty
+        
+        # If commanded velocity is zero, scale action smoothing penalty to encourage less jitter
+        # action_smoothing_penalty = jp.where(zero_cmd,
+        #                                     action_smoothing_penalty * self.reward_config.zero_vel_smoothing_multiplier,
+        #                                     action_smoothing_penalty)  
 
         # Wheel Collision Penalty:
         wheel_touch_penalty = self.wheel_touch_penalty(data)  # Calculate the penalty for wheel collisions based on the current simulation data
