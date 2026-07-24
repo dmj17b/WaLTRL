@@ -24,34 +24,44 @@ import inspect
 from pathlib import Path
 import wandb
 from environment.BaseEnv import BaseEnv
+from environment.RoughTerrainEnv import RoughTerrainEnv
+from configs.base_config import SimConfig, RewardConfig, CommandConfig, NoiseConfig  # Import configuration dataclasses.
 
 
 def main():
-    resume_path = None # Path to the saved PPO model parameters to resume training from
-    save_path = "policies/initial1"  # Path to save the new PPO model parameters after training
+    # resume_path = "policies/initial1" # Path to the saved PPO model parameters to resume training from
+    resume_path = None  # Set to None to start training from scratch
+    save_path = "policies/refine5"  # Path to save the new PPO model parameters after training
 
-    notes = "Another initial training test but now with T pose deviation and wheel collision penalties"
+    notes = "Removed t pose penalty"
 
-    env = BaseEnv()  # Create an instance of the BaseEnv environment
+    # env = BaseEnv(sim_config = SimConfig(),
+    #         reward_config = RewardConfig(),
+    #         command_config = CommandConfig(),)  # Create an instance of the BaseEnv environment
+
+    env = RoughTerrainEnv(sim_config = SimConfig(),
+            reward_config = RewardConfig(),
+            command_config = CommandConfig(),
+            difficulty = 0.5,)  # Create an instance of the RoughTerrainEnv environment
 
     wrapper_fn = wrapper.wrap_for_brax_training  # Use the standard Brax wrapper for training
     
     env_cfg = env.config  # Retrieve the environment configuration
     ppo_params = {
         'action_repeat': 1,
-        'batch_size': 512,  
-        'discounting': 0.995,
-        'entropy_cost': 0.001,
+        'batch_size': 256,  
+        'discounting': 0.99,
+        'entropy_cost': 0.03,
         'episode_length': env_cfg.episode_length,
         'learning_rate': 3e-4,
-        'num_envs': 2048,
+        'num_envs': 4096,
         'num_evals': 20,
-        'num_minibatches': 32,
+        'num_minibatches': 16,
         'num_updates_per_batch': 8,
-        'num_timesteps': 200_000_000,
+        'num_timesteps': 500_000_000,
         'normalize_observations': True,
         'reward_scaling': 1.0,
-        'unroll_length': 128,
+        'unroll_length': 256,
         'deterministic_eval': True,
         'seed': 42,
         }
@@ -68,11 +78,10 @@ def main():
         "env_config": env_cfg,
         "notes": notes,
         "resume_path": resume_path,
-        "save_path": save_path,
     }
-
     run = wandb.init(project=project, config=wandb_config)
-
+    # Use WandB run name for saving policy parameters
+    save_path = "policies/" + wandb.run.name
 
     def _to_float(value):
         """Safely converts JAX/NumPy scalars to plain Python floats for logging."""

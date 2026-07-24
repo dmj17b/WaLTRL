@@ -48,3 +48,13 @@
   - Increased tracking sigma to 0.3 from 0.2. Did not change ANYTHING else
   - Tracking was a little better than previous but behavior was still abnormal
   - I don't think T-Pose deviation penalty is helping much
+- hardy-glade-93
+  - BEST DRIVING POLICY BY FAR
+  - Only change from honest-snow-92 was increasing entropy cost from 0.001 to 0.01
+- fresh-grass-94
+  - Only change from hardy-glade-93 was increasing LR from 1e-4 to 3e-4
+  - much noisier learning, but velocity tracking reached similar values at a similar number of timesteps
+
+# Starting rough terrain training
+- radiant-universe-96
+  - First rough terrain training. Starting with params from hardy-glade-93

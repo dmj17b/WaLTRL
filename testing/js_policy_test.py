@@ -18,11 +18,12 @@ from brax.training.acme import running_statistics
 from pygame import joystick
 import pygame
 import environment.BaseEnv as BaseEnv
+import environment.RoughTerrainEnv as RoughTerrainEnv
 
 print(jax.devices())
 
 def main():
-    model_path = "policies/refine5"  # Path to the saved PPO model parameters
+    model_path = "policies/BEST_hardy-glade-93"  # Path to the saved PPO model parameters
 
     # Initialize joystick
     joystick.init()
@@ -32,7 +33,8 @@ def main():
     
 
     # Initialize the environment
-    env = BaseEnv.BaseEnv()  # Create an instance of the BaseEnv environment
+    env = RoughTerrainEnv.RoughTerrainEnv(difficulty=0.5)  # Create an instance of the BaseEnv environment
+    # env = BaseEnv.BaseEnv()
     key = jax.random.PRNGKey(2)  # Initialize a random key for JAX
 
     # JIT compile the reset and step functions
@@ -85,6 +87,7 @@ def main():
             if reset_button:
                 key, subkey = jax.random.split(key)
                 state = reset_fn(subkey)  # Reset the environment if the reset button is pressed
+            print(f"T Pose Deviation Penalty: {state.metrics['penalty/t_pose_deviation']}, Wheel Collision Penalty: {state.metrics['penalty/wheel_collisions']}")
 
             velocity_command = jp.array([
                 -js.get_axis(1)*env.command_config.max_lin_vel,  # Linear velocity command from joystick axis 0
@@ -114,7 +117,6 @@ def main():
                 action = jit_inference_fn(state.obs, key)  # Get action from the PPO policy
 
 
-            print(f"Command: {state.info['command']} - Action smoothing penalty: {state.metrics['penalty/action_smoothing']}")
 
             state = step_fn(state, action[0])  # Step the environment
             n_steps += 1

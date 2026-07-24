@@ -674,7 +674,7 @@ class GenModel():
             name='floor',
             type=mujoco.mjtGeom.mjGEOM_HFIELD,
             hfieldname='terrain',
-            pos=[0, 0, -0.75],
+            pos=[0, 0, -0.0],
             material='hfield_material',
         ) 
 

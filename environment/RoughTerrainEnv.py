@@ -42,7 +42,10 @@ class RoughTerrainEnv(BaseEnv):
         '''Randomize the initial position of the model within a specified range.'''
         qpos = jp.zeros(self.mj_model.nq)  # Start with default qpos
         qpos = qpos.at[3].set(1.0) # Initial rotation quaternion (w component)
-        qpos = qpos.at[2].set(0.3) # Initial height of the torso above the ground
+        qpos = qpos.at[2].set(0.7) # Initial height of the torso above the ground
+        [xpos, ypos] = jax.random.uniform(pos_rng, shape=(2,), minval=-10, maxval=10)  # Randomize x and y positions within [-10, 10]
+        qpos = qpos.at[0].set(xpos)  # Set randomized x position
+        qpos = qpos.at[1].set(ypos)  # Set randomized y
         return qpos
 
 

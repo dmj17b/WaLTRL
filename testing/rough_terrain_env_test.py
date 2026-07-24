@@ -116,13 +116,14 @@ def main():
                 state = reset_fn(key)  # Reset the environment if the episode is done
                 n_steps = 0
 
-            if n_steps > env.config.episode_length:
+            if n_steps > 100:
                 key, subkey = jax.random.split(key)
                 state = reset_fn(subkey)  # Reset the environment after 2000 steps for testing purposes
                 n_steps = 0
 
             state = step_fn(state, action)  # Step the environment
-            # print(f"Reward: {state.reward}, Command: {state.info['command']}, Done: {state.done}")
+
+            print(f"T Pose Deviation Penalty: {state.metrics['penalty/t_pose_deviation']}, Wheel Collision Penalty: {state.metrics['penalty/wheel_collisions']}")
 
             # Update the standard CPU mj_data with the new MJX state
             mjx.get_data_into(mj_data, env.mj_model, state.data)

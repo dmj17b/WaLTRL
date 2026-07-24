@@ -277,12 +277,12 @@ class BaseEnv(mjx_env.MjxEnv):
         wheel_touch_penalty = self.wheel_touch_penalty(data)  # Calculate the penalty for wheel collisions based on the current simulation data
 
         # T-Pose Deviation Penalty:
-        t_pose_deviation_penalty = self.t_pose_deviation_penalty(data)  
+        t_pose_deviation_penalty = self.reward_config.t_pose_deviation * self.t_pose_deviation_penalty(data)  
 
         # Calculate the total episode reward by summing rewards and subtracting penalties
         episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty \
               - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty - zero_vel_penalty \
-             - wheel_touch_penalty  - t_pose_deviation_penalty
+             - wheel_touch_penalty
 
 
         metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
