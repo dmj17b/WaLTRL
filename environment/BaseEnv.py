@@ -39,7 +39,8 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Generate WaLTER model spec, then add appropriate terrain/lighting elements
         model_config = 'modeling/model_configs/2_7_Scale/model_config.yaml'
-        motor_config = 'modeling/model_configs/2_7_Scale/motor_config.yaml'
+        # motor_config = 'modeling/model_configs/2_7_Scale/motor_config.yaml'
+        motor_config = 'modeling/model_configs/2_7_Scale/transparent_motors.yaml'
         self.model_spec = GenModel.GenModel(model_config, motor_config, include_waist_joint=False)  # Generate the model specification
         self.model_spec.add_scene()
         self._add_terrain()
@@ -52,8 +53,8 @@ class BaseEnv(mjx_env.MjxEnv):
 
         # Action scaling variables:
         self.hip_action_scale = 1.25  # Scaling factor for hip joint actions to limit the range of motion
-        self.knee_action_scale = 3.5  # Scaling factor for knee joint actions to limit the range of motion
-        self.wheel_action_scale = 30.0  # Scaling factor for wheel joint velocities to limit the maximum speed
+        self.knee_action_scale = 5.5  # Scaling factor for knee joint actions to limit the range of motion
+        self.wheel_action_scale = 60.0  # Scaling factor for wheel joint velocities to limit the maximum speed
 
         # Motor parameters:
         self.motor_params = yaml.safe_load(Path(motor_config).read_text())  # Load motor parameters from the motor configuration file

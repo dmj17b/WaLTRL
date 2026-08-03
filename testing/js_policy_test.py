@@ -1,5 +1,6 @@
 import os
 import sys
+import glob
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # Add parent directory to path
 # os.environ["JAX_PLATFORMS"] = "cpu"  # Force JAX to use CPU for this test
 import mujoco
@@ -23,7 +24,18 @@ import environment.RoughTerrainEnv as RoughTerrainEnv
 print(jax.devices())
 
 def main():
-    model_path = "policies/BEST_hardy-glade-93"  # Path to the saved PPO model parameters
+    model_path = None # Path to the saved PPO model parameters
+
+    # If model_path is none, select most recent model in policies directory
+    if model_path is None:
+        policies_dir = "policies"
+
+        # Sort files in policies by modification time and select the most recent one
+        files = filter(os.path.isfile, glob.glob('policies/*'))
+        model_path = max(files, key=os.path.getmtime, default=None)
+        if model_path is None:
+            raise FileNotFoundError("No model files found in policies directory")
+        print(f"Selected most recent model: {model_path}")
 
     # Initialize joystick
     joystick.init()
@@ -83,11 +95,10 @@ def main():
             # Get velocity command from joystick input (for testing purposes)
             pygame.event.pump()  # Process event queue to update joystick state
             
-            reset_button = js.get_button(0)
+            reset_button = js.get_button(1)
             if reset_button:
                 key, subkey = jax.random.split(key)
                 state = reset_fn(subkey)  # Reset the environment if the reset button is pressed
-            print(f"T Pose Deviation Penalty: {state.metrics['penalty/t_pose_deviation']}, Wheel Collision Penalty: {state.metrics['penalty/wheel_collisions']}")
 
             velocity_command = jp.array([
                 -js.get_axis(1)*env.command_config.max_lin_vel,  # Linear velocity command from joystick axis 0

@@ -1,0 +1,40 @@
+# NOTE: Stall torques and no-load spees are based on the ROTOR specs. Not the actuator output specs.
+# This is so we can accurately model reflected inertia and motor limitations at the rotor level
+# For example, the AK80-64 has a stall torque of 120Nm, but with a 64:1 gear ratio, the rotor stall torque is 120/64 = 1.875Nm. 
+# Similarly, the no-load speed of the rotor is 75 RPM, which translates to 75*64 = 4800rpm or 4800*2*pi/60 = 502.65 rad/s at the output shaft.
+
+waist_params:
+  spring_stiffness: 10
+  damping: 1
+  range: [-25, 25]
+  frictionloss: 0.1
+
+hip_params:
+  Kp: 150
+  Kd: 50
+  stall_torque: 50.48
+  no_load_speed: 502.65
+  gear_ratio: 10
+  rotor_inertia: 0.0002
+  damping: 2.0
+  frictionloss: 0.0
+
+knee_params:
+  Kp: 150
+  Kd: 50
+  stall_torque: 30.875
+  no_load_speed: 502.65
+  gear_ratio: 10
+  rotor_inertia: 0.0002
+  damping: 2.0
+  frictionloss: 0.0
+
+wheel_params:
+  Kp: 0.0
+  Kd: 12.0
+  stall_torque: 5.33
+  no_load_speed: 301.6
+  gear_ratio: 9.0
+  rotor_inertia: 0.0002
+  damping: 1.0
+  frictionloss: 0.1

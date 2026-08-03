@@ -42,10 +42,10 @@ class RoughTerrainEnv(BaseEnv):
         '''Randomize the initial position of the model within a specified range.'''
         qpos = jp.zeros(self.mj_model.nq)  # Start with default qpos
         qpos = qpos.at[3].set(1.0) # Initial rotation quaternion (w component)
-        qpos = qpos.at[2].set(0.7) # Initial height of the torso above the ground
+        qpos = qpos.at[2].set(self.difficulty+0.2) # Initial height of the torso above the ground
         [xpos, ypos] = jax.random.uniform(pos_rng, shape=(2,), minval=-10, maxval=10)  # Randomize x and y positions within [-10, 10]
         qpos = qpos.at[0].set(xpos)  # Set randomized x position
-        qpos = qpos.at[1].set(ypos)  # Set randomized y
+        qpos = qpos.at[1].set(ypos)  # Set randomized y position
         return qpos
 
 
@@ -139,7 +139,7 @@ class RoughTerrainEnv(BaseEnv):
     def _add_terrain(self):
         '''Defines the terrain for the environment and then applies necessary contact pairs.
         Make sure to update this function and contact pairs for every new environment.'''
-        self.model_spec.add_hfield(height = self.difficulty, sigma = 0.6)
+        self.model_spec.add_hfield(height = self.difficulty, sigma = 0.3)
         self.model_spec.add_contact_pairs()  # Add contact pairs for wheel-ground interactions
 
 

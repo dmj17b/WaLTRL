@@ -513,11 +513,30 @@ class GenModel():
             objtype = mujoco.mjtObj.mjOBJ_SITE,
         )
 
+        # Wheel contact sensors:
 
         self.spec = spec
 
-
-
+    def add_wheel_contact_sensors(self):
+        wheel_names = [
+            'torso_left_front_wheel_geom',
+            'torso_left_rear_wheel_geom',
+            'torso_right_front_wheel_geom',
+            'torso_right_rear_wheel_geom',
+            'head_left_front_wheel_geom',
+            'head_left_rear_wheel_geom',
+            'head_right_front_wheel_geom',
+            'head_right_rear_wheel_geom',
+        ]
+        for wheel_name in wheel_names:
+            self.spec.add_sensor(
+                name = f'{wheel_name}_contact',
+                type = mujoco.mjtSensor.mjSENS_TOUCH,
+                objname = wheel_name,
+                objtype = mujoco.mjtObj.mjOBJ_GEOM,
+            )
+        
+        
     def add_contact_pairs(self,
                           added_obstacles: list = None):
         # Add contact pairs for wheel-ground interactions:
@@ -747,7 +766,7 @@ def main(argv=None):
     )
 
     with open(xml_path, "w") as f:
-        f.writelines(model_class.model_xml)
+        f.writelines(model_class.spec.to_xml_string())
 
     # Open mujoco viewer
     mujoco.viewer.launch(model_class.model_xml)
