@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 def main():
     key = jax.random.PRNGKey(0)
-    env = RoughTerrainEnv(difficulty=0.5)  # Create an instance of the RoughTerrainEnv environment
+    env = RoughTerrainEnv(difficulty=0.8, smoothing=0.6)  # Create an instance of the RoughTerrainEnv environment
     reset_fn = jax.jit(env.reset)
     step_fn = jax.jit(env.step)
 

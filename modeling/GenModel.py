@@ -22,6 +22,7 @@ class GenModel():
         spec = mujoco.MjSpec()
 
         color = np.array([177/255, 166/255, 136/255, 1])
+        site_color = np.array([0, 1, 0, 1])
 
         # Parse Configs:
         model_config = yaml.safe_load(Path(model_config_path).read_text())
@@ -130,7 +131,7 @@ class GenModel():
             name = 'torso_com',
             pos = [0.15, 0, 0],
             type = mujoco.mjtGeom.mjGEOM_SPHERE,
-            rgba = [1, 0, 0, 1],
+            rgba = site_color,
             size = [0.05, 0.05, 0.05],
             )
 
@@ -198,6 +199,7 @@ class GenModel():
                     body_name = f'torso_{side}_{child}'
                     joint_name = f'{parent}_{side}_{child}_joint'
                 geom_name = f'{body_name}_geom'
+                site_name = f'{body_name}_site'
                 parent_body = spec.worldbody.find_child(parent_name)
                 body = parent_body.add_body(
                     name=body_name,
@@ -223,6 +225,14 @@ class GenModel():
                         friction = wheel_friction,
                         solref = wheel_solref,
                         rgba = color,
+                    )
+                    body.add_site(
+                        name = site_name,
+                        pos = mirror * torso_children_params[child]['geom_pos'],
+                        type=torso_children_params[child]['geom_type'],
+                        rgba = site_color,
+                        quat = torso_children_params[child]['geom_quat'],
+                        size=torso_children_params[child]['geom_size'] + [0.01, 0.01, 0.01],
                     )
                 else:
                     body.add_geom(
@@ -273,7 +283,7 @@ class GenModel():
             name = 'head_com',
             pos = [0.0, 0, 0],
             type = mujoco.mjtGeom.mjGEOM_SPHERE,
-            rgba = [1, 0, 0, 1],
+            rgba = site_color,
             size = [0.05, 0.05, 0.05],
             )
 
@@ -341,6 +351,7 @@ class GenModel():
                     body_name = f'head_{side}_{child}'
                     joint_name = f'{parent}_{side}_{child}_joint'
                 geom_name = f'{body_name}_geom'
+                site_name = f'{body_name}_site'
                 parent_body = spec.worldbody.find_child(parent_name)
                 body = parent_body.add_body(
                     name=body_name,
@@ -366,6 +377,14 @@ class GenModel():
                         friction = wheel_friction,
                         solref = wheel_solref,
                         rgba = color,
+                    )
+                    body.add_site(
+                        name = site_name,
+                        pos = mirror * head_children_params[child]['geom_pos'],
+                        type=head_children_params[child]['geom_type'],
+                        rgba = site_color,
+                        quat=head_children_params[child]['geom_quat'],
+                        size=head_children_params[child]['geom_size'] + [0.01, 0.01, 0.01],
                     )
                 else:
                     body.add_geom(
@@ -516,24 +535,26 @@ class GenModel():
         # Wheel contact sensors:
 
         self.spec = spec
+        self.add_wheel_contact_sensors()
+        self.spec = spec
 
     def add_wheel_contact_sensors(self):
         wheel_names = [
-            'torso_left_front_wheel_geom',
-            'torso_left_rear_wheel_geom',
-            'torso_right_front_wheel_geom',
-            'torso_right_rear_wheel_geom',
-            'head_left_front_wheel_geom',
-            'head_left_rear_wheel_geom',
-            'head_right_front_wheel_geom',
-            'head_right_rear_wheel_geom',
+            'torso_left_front_wheel',
+            'torso_left_rear_wheel',
+            'torso_right_front_wheel',
+            'torso_right_rear_wheel',
+            'head_left_front_wheel',
+            'head_left_rear_wheel',
+            'head_right_front_wheel',
+            'head_right_rear_wheel',
         ]
         for wheel_name in wheel_names:
             self.spec.add_sensor(
-                name = f'{wheel_name}_contact',
+                name = f'{wheel_name}_touch',
                 type = mujoco.mjtSensor.mjSENS_TOUCH,
-                objname = wheel_name,
-                objtype = mujoco.mjtObj.mjOBJ_GEOM,
+                objname = f'{wheel_name}_site',
+                objtype = mujoco.mjtObj.mjOBJ_SITE,
             )
         
         

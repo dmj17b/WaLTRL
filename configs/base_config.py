@@ -8,16 +8,16 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 
 @flax.struct.dataclass
 class RewardConfig:
-    lin_vel_tracking: float = 1200.0
-    ang_vel_tracking: float = 1000.0
+    lin_vel_tracking: float = 100.0
+    ang_vel_tracking: float = 100.0
     tracking_sigma: float = 0.35
-    body_pitch_vel: float = 5.0
-    body_roll_vel: float = 5.0
-    orientation: float = 50.0
+    body_pitch_vel: float = 0.5
+    body_roll_vel: float = 0.5
+    orientation: float = 1.0
     low_torques: float = 0.0005
-    body_z_vel: float = 50.0
-    action_smoothing: float = 250.0
-    zero_vel_smoothing_multiplier: float = 0.2  # Multiplier for action smoothing penalty when command is zero
+    body_z_vel: float = 5.0
+    action_smoothing: float = 1000.0
+    zero_vel_smoothing_multiplier: float = 5.0  # Multiplier for action smoothing penalty when command is zero
     flipped: float = 100000.0
     wheel_collision: float = 10000.0
     t_pose_deviation: float = 0.0

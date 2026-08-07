@@ -45,7 +45,7 @@ def main():
     
 
     # Initialize the environment
-    env = RoughTerrainEnv.RoughTerrainEnv(difficulty=0.5)  # Create an instance of the BaseEnv environment
+    env = RoughTerrainEnv.RoughTerrainEnv(difficulty=0.8, smoothing=0.6)  # Create an instance of the BaseEnv environment
     # env = BaseEnv.BaseEnv()
     key = jax.random.PRNGKey(2)  # Initialize a random key for JAX
 
@@ -89,17 +89,15 @@ def main():
             start_time = time.time()
             # Update the standard CPU mj_data with the new MJX state
             mjx.get_data_into(mj_data, env.mj_model, state.data)
+            # Print Task Reward and Orientation Reward for debugging
+            print(f"Task Reward: {state.metrics['reward/task']:.4f}, Orientation Reward: {state.metrics['reward/orientation']:.4f}")
+
 
             viewer.sync()  # Sync the viewer to update the visualization
 
             # Get velocity command from joystick input (for testing purposes)
             pygame.event.pump()  # Process event queue to update joystick state
             
-            reset_button = js.get_button(1)
-            if reset_button:
-                key, subkey = jax.random.split(key)
-                state = reset_fn(subkey)  # Reset the environment if the reset button is pressed
-
             velocity_command = jp.array([
                 -js.get_axis(1)*env.command_config.max_lin_vel,  # Linear velocity command from joystick axis 0
                 -js.get_axis(0)*env.command_config.max_ang_vel,  # Linear velocity command from joystick axis 1
@@ -121,7 +119,13 @@ def main():
                     ctrl=jp.array(mj_data.ctrl),
                 )
             )
-        
+
+
+
+            reset_button = js.get_button(1)
+            if reset_button:
+                key, subkey = jax.random.split(key)
+                state = reset_fn(subkey)  # Reset the environment if the reset button is pressed
 
             # Sample a random action (for testing purposes) every 5 sim steps:
             if n_steps % 5 == 0:
@@ -131,6 +135,7 @@ def main():
 
             state = step_fn(state, action[0])  # Step the environment
             n_steps += 1
+
 
             elapsed = time.time()-start_time
             if elapsed < dt:

@@ -14,9 +14,9 @@
 - [x] Define contact pairs for body
 - [x] Define contact pairs for shins
 - [x] Double check that the flip-over condition is not overly generous (wasting time steps when all but guaranteed to flip)
-- [ ] Wheel reaction forces
-  - [ ] Add sensors
-  - [ ] Apply wheel rotation to get body frame reaction forces
+- [x] Wheel reaction forces
+  - [x] Add sensors
+  - [x] Add data to value observation
 
 
 # Ideas for improving training

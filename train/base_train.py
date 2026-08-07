@@ -29,9 +29,9 @@ from configs.base_config import SimConfig, RewardConfig, CommandConfig, NoiseCon
 
 
 def main():
-    resume_path = "policies/colorful-oath-116"  # Path to the saved PPO model parameters
+    resume_path = None  # Path to the saved PPO model parameters
 
-    notes = "Refine train from colorful-oath-116"
+    notes = "Messed up thinking I was changing the correct reward function. Now formulated with task reward"
 
     # env = BaseEnv(sim_config = SimConfig(),
     #         reward_config = RewardConfig(),
@@ -40,7 +40,8 @@ def main():
     env = RoughTerrainEnv(sim_config = SimConfig(),
             reward_config = RewardConfig(),
             command_config = CommandConfig(),
-            difficulty = 0.5,)  # Create an instance of the RoughTerrainEnv environment
+            difficulty = 0.8,
+            smoothing = 0.6)  # Create an instance of the RoughTerrainEnv environment
 
     wrapper_fn = wrapper.wrap_for_brax_training  # Use the standard Brax wrapper for training
     

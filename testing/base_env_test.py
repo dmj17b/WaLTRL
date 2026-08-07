@@ -108,8 +108,7 @@ def main():
             # Substitute joystick actions for testing:
             action = build_action()
 
-            # Test wheel collision detection:
-            print(f"T Pose Deviation Penalty: {state.metrics['penalty/t_pose_deviation']}, Wheel Collision Penalty: {state.metrics['penalty/wheel_collisions']}")
+
             # Reset conditions:
             if state.done:
                 print("Episode done. Resetting environment.")

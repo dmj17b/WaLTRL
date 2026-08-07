@@ -109,6 +109,8 @@ class BaseEnv(mjx_env.MjxEnv):
         metrics = {
             "reward/lin_vel_tracking": 0.0,
             "reward/ang_vel_tracking": 0.0,
+            "reward/orientation": 0.0,
+            "reward/task": 0.0,
             "penalty/action_smoothing": 0.0,
             "penalty/torques": 0.0,
             "penalty/orientation": 0.0,
@@ -188,7 +190,6 @@ class BaseEnv(mjx_env.MjxEnv):
 
         reward = self._get_reward(data, action, info, state.metrics)
         done = jp.zeros(())  # Placeholder for episode termination condition
-        metrics = state.metrics
         
         info["prev_action"] = action
 
@@ -196,7 +197,7 @@ class BaseEnv(mjx_env.MjxEnv):
         upvec = data.sensordata[self.body_upvec_adrs:self.body_upvec_adrs + self.body_upvec_dim]
         done = jp.where(upvec[2] < 0.1, 1.0, done)  # Terminate episode if the up vector's Z component is less than -0.1 (indicating a fallover)
 
-        return mjx_env.State(data, obs, reward, done, metrics, info)
+        return mjx_env.State(data, obs, reward, done, state.metrics, info)
     
     def hip_controller(self, data: mjx.Data, hip_actions: jax.Array, rng: jax.Array) -> jax.Array:
         '''Calculate the control signals for the hip motors based on the current state, action, and command.'''
@@ -227,7 +228,7 @@ class BaseEnv(mjx_env.MjxEnv):
                     action: jax.Array,
                     info: Dict[str,Any],
                     metrics: Dict[str, Any]) -> jax.Array:
-        '''Basic reward function. This will likely be overwritten for most other environments, but common reward components can be implemented here.'''
+
         # Tracking rewards:
         # Calculate linear velocity tracking reward based on the current command and the body linear velocity from the sensor data
         lin_vel_tracking_reward = self.reward_config.lin_vel_tracking * self.tracking_reward(info["command"][0], 
@@ -238,9 +239,15 @@ class BaseEnv(mjx_env.MjxEnv):
                                                                                              sigma = self.reward_config.tracking_sigma)  # Calculate angular velocity tracking reward based on the current command and the body angular velocity from the sensor data
 
         # Orientation Penalty:
-        torso_rot_mat = data.xmat[self.torso_body_id]  # Extract the torso rotation matrix from the simulation data
+        torso_rot_mat = data.xmat[self.torso_body_id].reshape((3,3))  # Extract the torso rotation matrix from the simulation data
         up_vector = torso_rot_mat[:, 2]  # Extract the up vector from the torso rotation matrix
         orientation_penalty = self.reward_config.orientation * jp.sum(jp.square(up_vector - jp.array([0.0, 0.0, 1.0])))  # Calculate the squared distance of the up vector from the ideal up vector (0, 0, 1) for orientation penalty
+
+        # Orientation tracking (reformulating)
+        orientation_reward = self.reward_config.orientation * self.tracking_reward(1.0, up_vector[2], sigma = 0.05)  # Calculate orientation tracking reward based on the Z component of the up vector
+
+        # Task reward:
+        task_reward = lin_vel_tracking_reward*orientation_reward*ang_vel_tracking_reward  # Combine tracking rewards into a single task reward
 
         # Roll and Pitch Velocity Penalties:
         roll_vel = data.qvel[self.torso_qveladr+3]  # Extract the roll velocity from the body angular velocity
@@ -270,9 +277,9 @@ class BaseEnv(mjx_env.MjxEnv):
         action_smoothing_penalty = self.reward_config.action_smoothing * jp.sum(jp.square(action - info["prev_action"]))  # Calculate the squared difference between the current action and the previous action for smoothing penalty
         
         # If commanded velocity is zero, scale action smoothing penalty to encourage less jitter
-        # action_smoothing_penalty = jp.where(zero_cmd,
-        #                                     action_smoothing_penalty * self.reward_config.zero_vel_smoothing_multiplier,
-        #                                     action_smoothing_penalty)  
+        action_smoothing_penalty = jp.where(zero_cmd,
+                                            action_smoothing_penalty * self.reward_config.zero_vel_smoothing_multiplier,
+                                            action_smoothing_penalty)  
 
         # Wheel Collision Penalty:
         wheel_touch_penalty = self.wheel_touch_penalty(data)  # Calculate the penalty for wheel collisions based on the current simulation data
@@ -281,13 +288,15 @@ class BaseEnv(mjx_env.MjxEnv):
         t_pose_deviation_penalty = self.reward_config.t_pose_deviation * self.t_pose_deviation_penalty(data)  
 
         # Calculate the total episode reward by summing rewards and subtracting penalties
-        episode_reward = lin_vel_tracking_reward + ang_vel_tracking_reward - orientation_penalty - torque_penalty \
+        episode_reward = task_reward - torque_penalty \
               - flip_penalty - body_z_vel_penalty - roll_penalty - pitch_penalty - action_smoothing_penalty - zero_vel_penalty \
              - wheel_touch_penalty
 
 
         metrics["reward/lin_vel_tracking"] = lin_vel_tracking_reward  # Log the linear velocity tracking reward in the metrics dictionary
         metrics["reward/ang_vel_tracking"] = ang_vel_tracking_reward  # Log the angular velocity tracking reward in the metrics dictionary
+        metrics["reward/orientation"] = orientation_reward  # Log the orientation tracking reward in the metrics dictionary
+        metrics["reward/task"] = task_reward  # Log the combined task reward in the metrics dictionary
         metrics["penalty/orientation"] = orientation_penalty  # Log the orientation penalty in the metrics dictionary
         metrics["penalty/roll_velocity"] = roll_penalty  # Log the roll velocity penalty in the metrics dictionary
         metrics["penalty/pitch_velocity"] = pitch_penalty  # Log the pitch velocity penalty in the metrics dictionary
@@ -328,8 +337,6 @@ class BaseEnv(mjx_env.MjxEnv):
         r_contact_count = jp.sum(r_dists < self.wheel_collision_threshold)
         total_contacts = l_contact_count + r_contact_count
         
-        # Apply penalty weight per active contact
-        penalty_amount = 1.0 
         return total_contacts * self.reward_config.wheel_collision
 
 
@@ -435,6 +442,7 @@ class BaseEnv(mjx_env.MjxEnv):
         joint_torques = data.qfrc_actuator[self.act_ids]  # Add noise to the joint torques for observation
 
         # Ground reaction forces:
+        grf = data.sensordata[self.wheel_touch_adrs]
 
         # Concatenate everything into observation vector:
         obs = jp.concatenate([
@@ -448,7 +456,8 @@ class BaseEnv(mjx_env.MjxEnv):
             joint_torques,
             torso_vel,
             accel,
-            gyro
+            gyro,
+            grf
 
             ])
         
@@ -569,6 +578,17 @@ class BaseEnv(mjx_env.MjxEnv):
         self.body_upvec_adrs = self.mj_model.sensor_adr[self.body_upvec_sensor_id]  # Get the addresses for the body up vector sensor
         self.body_upvec_dim = self.mj_model.sensor_dim[self.body_upvec_sensor_id]  # Get the dimensionality of the body up vector sensor
 
+        self.wheel_names = [
+            'torso_left_front_wheel',
+            'torso_left_rear_wheel',
+            'torso_right_front_wheel',
+            'torso_right_rear_wheel',
+            'head_left_front_wheel',
+            'head_left_rear_wheel',
+            'head_right_front_wheel',
+            'head_right_rear_wheel'
+        ]
+
         self.wheel_geom_names = [
             'torso_left_front_wheel_geom',
             'torso_left_rear_wheel_geom',
@@ -603,6 +623,22 @@ class BaseEnv(mjx_env.MjxEnv):
         # Collision occurs if center-to-center distance is less than 2x radius
         self.wheel_collision_threshold = 2.0 * self.mj_model.geom_size[wheel_geom_id, 0]
         self.wheel_geom_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_GEOM, name) for name in self.wheel_geom_names]  # Get the geometry IDs for the wheel geometries
+
+        # Wheel touch sensors:
+        self.wheel_touch_sensor_names = [
+            'torso_left_front_wheel_touch',
+            'torso_left_rear_wheel_touch',
+            'torso_right_front_wheel_touch',
+            'torso_right_rear_wheel_touch',
+            'head_left_front_wheel_touch',
+            'head_left_rear_wheel_touch',
+            'head_right_front_wheel_touch',
+            'head_right_rear_wheel_touch'
+        ]
+        self.wheel_touch_sensor_ids = [mujoco.mj_name2id(self.mj_model, mujoco.mjtObj.mjOBJ_SENSOR, name) for name in self.wheel_touch_sensor_names]  # Get the sensor IDs for the wheel touch sensors
+        self.wheel_touch_adrs = [self.mj_model.sensor_adr[sensor_id] for sensor_id in self.wheel_touch_sensor_ids]  # Get the addresses for the wheel touch sensors
+        self.wheel_touch_adrs = jp.asarray(self.wheel_touch_adrs)  # Convert the wheel touch addresses to a JAX array for easy indexing
+
 
     def _add_terrain(self):
         '''Defines the terrain for the environment and then applies necessary contact pairs.
