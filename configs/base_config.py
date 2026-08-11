@@ -31,8 +31,8 @@ class CommandConfig:
     max_ang_vel: float = 1.0
     min_cmd_duration: float = 1.0
     max_cmd_duration: float = 10.0
-    zero_lin_prob: float = 0.2
-    zero_ang_prob: float = 0.2
+    zero_lin_prob: float = 0.1
+    zero_ang_prob: float = 0.1
     zero_all_prob: float = 0.2
 
 

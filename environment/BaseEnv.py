@@ -29,6 +29,7 @@ class BaseEnv(mjx_env.MjxEnv):
             sim_config = SimConfig(),
             reward_config = RewardConfig(),
             command_config = CommandConfig(),
+            include_waist_joint: bool = False
     ):
         super().__init__(config=sim_config)
         
@@ -41,7 +42,7 @@ class BaseEnv(mjx_env.MjxEnv):
         model_config = 'modeling/model_configs/2_7_Scale/model_config.yaml'
         # motor_config = 'modeling/model_configs/2_7_Scale/motor_config.yaml'
         motor_config = 'modeling/model_configs/2_7_Scale/transparent_motors.yaml'
-        self.model_spec = GenModel.GenModel(model_config, motor_config, include_waist_joint=False)  # Generate the model specification
+        self.model_spec = GenModel.GenModel(model_config, motor_config, include_waist_joint=include_waist_joint)  # Generate the model specification
         self.model_spec.add_scene()
         self._add_terrain()
         self._mj_model = self.model_spec.spec.compile()

@@ -30,13 +30,14 @@ class RoughTerrainEnv(BaseEnv):
             self,
             difficulty = 0.5,  # Difficulty level for terrain generation (0.0 to 1.0).
             smoothing = 0.5,
+            include_waist_joint: bool = False,
             sim_config = SimConfig(),
             reward_config = RewardConfig(),
             command_config = CommandConfig(),
     ):
         self.difficulty = difficulty
         self.smoothing = smoothing
-        super().__init__(sim_config, reward_config, command_config)  # Initialize the BaseEnv with the provided configurations.
+        super().__init__(sim_config, reward_config, command_config, include_waist_joint=include_waist_joint)  # Initialize the BaseEnv with the provided configurations.
         
 
     def _reset_model_qpos(self, pos_rng: jax.Array) -> jax.Array:

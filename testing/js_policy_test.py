@@ -45,7 +45,7 @@ def main():
     
 
     # Initialize the environment
-    env = RoughTerrainEnv.RoughTerrainEnv(difficulty=0.8, smoothing=0.6)  # Create an instance of the BaseEnv environment
+    env = RoughTerrainEnv.RoughTerrainEnv(difficulty=0.8, smoothing=0.6, include_waist_joint=True)  # Create an instance of the BaseEnv environment
     # env = BaseEnv.BaseEnv()
     key = jax.random.PRNGKey(2)  # Initialize a random key for JAX
 
@@ -84,14 +84,19 @@ def main():
     # Launch standard MuJoCo viewer
     n_steps = 0
     with mujoco.viewer.launch_passive(env.mj_model, mj_data) as viewer:
+        viewer.cam.azimuth = 85.8
+        viewer.cam.elevation = -11.78
+        viewer.cam.distance = 4.79
+        viewer.cam.lookat = np.array([2.97, 0.27, 1.136])
         while viewer.is_running():
             # Keep track of step time
             start_time = time.time()
             # Update the standard CPU mj_data with the new MJX state
             mjx.get_data_into(mj_data, env.mj_model, state.data)
-            # Print Task Reward and Orientation Reward for debugging
-            print(f"Task Reward: {state.metrics['reward/task']:.4f}, Orientation Reward: {state.metrics['reward/orientation']:.4f}")
 
+
+            # Print camera angle info for setting up consistent shots:
+            print(f"azimuth: {viewer.cam.azimuth}, elevation: {viewer.cam.elevation}, distance: {viewer.cam.distance}, lookat: {viewer.cam.lookat}")
 
             viewer.sync()  # Sync the viewer to update the visualization
 

@@ -31,7 +31,7 @@ from configs.base_config import SimConfig, RewardConfig, CommandConfig, NoiseCon
 def main():
     resume_path = None  # Path to the saved PPO model parameters
 
-    notes = "Messed up thinking I was changing the correct reward function. Now formulated with task reward"
+    notes = "Absolutely zero change besides enabling waist joint"
 
     # env = BaseEnv(sim_config = SimConfig(),
     #         reward_config = RewardConfig(),
